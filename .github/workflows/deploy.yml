@@ -1,0 +1,74 @@
+name: Deploy Mapsy Widget
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Widget
+        run: npm run build
+        env:
+          NODE_ENV: production
+          VITE_API_URL: https://mapsy-api.nextechspires.com
+
+      - name: Deploy to production server
+        env:
+          HOST: 51.79.66.78
+          USERNAME: shahen
+          PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          TARGET_DIR: /var/www/mapsy-widget.nextechspires.com
+        run: |
+          # Install sshpass for password authentication
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+          # Create temporary SSH config to skip host key checking
+          mkdir -p ~/.ssh
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+
+          # Remove existing files on remote server
+          sshpass -p "$PASSWORD" ssh $USERNAME@$HOST "sudo rm -rf $TARGET_DIR/*"
+
+          # Copy build files to remote server
+          sshpass -p "$PASSWORD" scp -r dist/* $USERNAME@$HOST:/tmp/widget-dist/
+
+          # Move files to target directory and set permissions
+          sshpass -p "$PASSWORD" ssh $USERNAME@$HOST "
+            sudo mkdir -p $TARGET_DIR
+            sudo mv /tmp/widget-dist/* $TARGET_DIR/
+            sudo chown -R www-data:www-data $TARGET_DIR
+            sudo chmod -R 755 $TARGET_DIR
+            rm -rf /tmp/widget-dist
+          "
+
+      - name: Notify deployment success
+        if: success()
+        run: echo "✅ Mapsy Widget deployed successfully to production!"
+
+      - name: Notify deployment failure
+        if: failure()
+        run: echo "❌ Widget deployment failed. Check the logs for details."
