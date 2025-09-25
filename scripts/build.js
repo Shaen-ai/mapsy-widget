@@ -45,21 +45,24 @@ async function buildWidget() {
     // Clean dist directory
     await fs.emptyDir(path.resolve(__dirname, '../dist'));
 
-    // Build the widget (non-minified)
-    console.log('📦 Building mapsy-widget.js...');
+    // Build the widget with Vite
+    console.log('📦 Building widget...');
     await build({
       configFile: path.resolve(__dirname, '../vite.config.ts'),
       mode: 'production'
     });
 
-    // Read the built file
+    // Read the built widget file
     const distPath = path.resolve(__dirname, '../dist');
-    const widgetPath = path.join(distPath, 'mapsy-widget.js');
-    const widgetCode = await fs.readFile(widgetPath, 'utf-8');
+    const builtWidgetPath = path.join(distPath, 'mapsy-widget.js');
+    const widgetCode = await fs.readFile(builtWidgetPath, 'utf-8');
 
-    // Create minified version
+    // Delete the original unminified file
+    await fs.remove(builtWidgetPath);
+
+    // Create mapsy-widget.min.js (minified widget)
     console.log('📦 Creating mapsy-widget.min.js...');
-    const minified = await minify(widgetCode, {
+    const minifiedWidget = await minify(widgetCode, {
       compress: {
         drop_console: false,
         drop_debugger: true
@@ -72,117 +75,63 @@ async function buildWidget() {
 
     await fs.writeFile(
       path.join(distPath, 'mapsy-widget.min.js'),
-      minified.code
+      minifiedWidget.code
     );
 
-    // Copy and update manifest
-    console.log('📋 Creating manifest.json...');
+    // Create widget-manifest.json
+    console.log('📋 Creating widget-manifest.json...');
     const manifestPath = path.resolve(__dirname, '../src/manifest.json');
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf-8'));
     manifest.buildTime = new Date().toISOString();
 
     await fs.writeFile(
-      path.join(distPath, 'manifest.json'),
+      path.join(distPath, 'widget-manifest.json'),
       JSON.stringify(manifest, null, 2)
     );
 
-    // Copy loader script (this is the main entry point now)
-    console.log('📦 Copying loader script...');
+    // Create mapsy-widget.js (LOADER - small file that loads the actual widget)
+    console.log('📦 Creating mapsy-widget.js (loader)...');
     const loaderPath = path.resolve(__dirname, '../src/loader.js');
     const loaderContent = await fs.readFile(loaderPath, 'utf-8');
 
-    // Minify the loader
+    // Minify the loader but keep it readable
     const minifiedLoader = await minify(loaderContent, {
       compress: {
         drop_console: false,
         drop_debugger: true
       },
-      mangle: false, // Don't mangle the loader for better debugging
+      mangle: false, // Don't mangle for better debugging
       format: {
         comments: false
       }
     });
 
-    // Save as mapsy-widget.js (the main entry point)
     await fs.writeFile(
-      path.join(distPath, 'mapsy-widget-loader.js'),
+      path.join(distPath, 'mapsy-widget.js'),
       minifiedLoader.code
     );
 
-    // Create versioned copies (optional - for CDN caching)
-    console.log('📦 Creating versioned files...');
-    await fs.copy(
-      path.join(distPath, 'mapsy-widget.min.js'),
-      path.join(distPath, `mapsy-widget-${version}.min.js`)
-    );
-    await fs.copy(
-      path.join(distPath, 'style.css'),
-      path.join(distPath, `style-${version}.css`)
-    );
-
-    // Create integration HTML with new loader
-    console.log('📄 Creating integration example...');
-    const integrationHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapsy Widget Integration</title>
-</head>
-<body>
-    <h1>Mapsy Widget Integration Example</h1>
-
-    <!-- Method 1: Simple integration -->
-    <mapsy-widget></mapsy-widget>
-
-    <!-- Method 2: With configuration -->
-    <mapsy-widget
-        data-api-url="http://localhost:8000/api"
-        data-default-view="list">
-    </mapsy-widget>
-
-    <!--
-    The loader script:
-    1. Fetches manifest.json (no-cache)
-    2. Gets the current version
-    3. Loads mapsy-widget.min.js with version query parameter
-    4. Loads style.css with version query parameter
-    5. Auto-initializes all <mapsy-widget> elements
-    -->
-    <script src="mapsy-widget-loader.js"></script>
-</body>
-</html>`;
-
-    await fs.writeFile(
-      path.join(distPath, 'integration.html'),
-      integrationHtml
-    );
-
-    // Print file sizes
-    const files = [
-      'manifest.json',
-      'mapsy-widget-loader.js',
-      'mapsy-widget.js',
-      'mapsy-widget.min.js',
-      'style.css'
-    ];
+    // Print results
     console.log('\n✨ Build complete!\n');
-    console.log('📊 File sizes:');
+    console.log('📊 Production files:');
+
+    const files = [
+      { name: 'mapsy-widget.js', desc: 'Loader (entry point)' },
+      { name: 'mapsy-widget.min.js', desc: 'Widget (minified)' },
+      { name: 'widget-manifest.json', desc: 'Version manifest' },
+      { name: 'style.css', desc: 'Widget styles' }
+    ];
 
     for (const file of files) {
-      const filePath = path.join(distPath, file);
+      const filePath = path.join(distPath, file.name);
       if (await fs.pathExists(filePath)) {
         const stats = await fs.stat(filePath);
         const sizeKB = (stats.size / 1024).toFixed(2);
-        console.log(`  • ${file}: ${sizeKB} KB`);
+        console.log(`  • ${file.name.padEnd(22)} ${sizeKB.padStart(10)} KB  - ${file.desc}`);
       }
     }
 
     console.log(`\n🔖 Version: ${version}`);
-    console.log(`📁 Output: ${distPath}`);
-    console.log('\n📌 Integration:');
-    console.log('  Use mapsy-widget-loader.js as the main script');
-    console.log('  It will automatically load the latest version with cache busting');
 
   } catch (error) {
     console.error('❌ Build failed:', error);

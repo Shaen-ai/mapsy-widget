@@ -1,21 +1,23 @@
 /**
  * Mapsy Widget Loader
- * Simplified loader based on working yoga widget approach
+ * Exactly matching yoga widget's working approach
  */
 (function() {
   'use strict';
 
   // Configuration
   const WIDGET_CONFIG = {
-    baseUrl: '', // Will be auto-detected from script location
-    cacheTimeout: 3600000, // 1 hour in milliseconds
-    manifestPath: '/manifest.json'
+    baseUrl: '', // Will be auto-detected
+    cacheTimeout: 3600000, // 1 hour
+    manifestPath: '/widget-manifest.json' // Matching yoga widget
   };
 
   // Auto-detect base URL from current script
   const currentScript = document.currentScript || document.querySelector('script[src*="mapsy-widget"]');
   if (currentScript) {
-    WIDGET_CONFIG.baseUrl = currentScript.src.replace(/[^\/]*$/, '').replace(/\/$/, '');
+    // Get base URL without the script name
+    const scriptUrl = currentScript.src;
+    WIDGET_CONFIG.baseUrl = scriptUrl.substring(0, scriptUrl.lastIndexOf('/'));
   }
 
   // Check if widget is already loaded
@@ -32,54 +34,33 @@
     const cacheTimeKey = 'mapsy-widget-version-time';
 
     // Check localStorage cache first
-    try {
-      const cachedVersion = localStorage.getItem(cacheKey);
-      const cacheTime = localStorage.getItem(cacheTimeKey);
+    const cachedVersion = localStorage.getItem(cacheKey);
+    const cacheTime = localStorage.getItem(cacheTimeKey);
 
-      if (cachedVersion && cacheTime) {
-        const now = Date.now();
-        const timeDiff = now - parseInt(cacheTime);
+    if (cachedVersion && cacheTime) {
+      const now = Date.now();
+      const timeDiff = now - parseInt(cacheTime);
 
-        // Use cache if it's still valid
-        if (timeDiff < WIDGET_CONFIG.cacheTimeout) {
-          console.log('[Mapsy Widget] Using cached version:', cachedVersion);
-          return Promise.resolve(cachedVersion);
-        }
+      // Use cache if still valid
+      if (timeDiff < WIDGET_CONFIG.cacheTimeout) {
+        return Promise.resolve(cachedVersion);
       }
-    } catch (e) {
-      // localStorage might not be available
-      console.warn('[Mapsy Widget] localStorage not available');
     }
 
-    // Fetch latest version from manifest - simple fetch, no special headers
-    const manifestUrl = WIDGET_CONFIG.baseUrl + WIDGET_CONFIG.manifestPath;
-
-    return fetch(manifestUrl)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Manifest not found');
-        }
-        return response.json();
-      })
+    // Fetch latest version from manifest - exactly like yoga widget
+    return fetch(WIDGET_CONFIG.baseUrl + WIDGET_CONFIG.manifestPath)
+      .then(response => response.json())
       .then(manifest => {
-        const version = manifest.version || '1.0.0';
-        console.log('[Mapsy Widget] Fetched version from manifest:', version);
-
-        // Cache the version in localStorage
-        try {
-          localStorage.setItem(cacheKey, version);
-          localStorage.setItem(cacheTimeKey, Date.now().toString());
-        } catch (e) {
-          // Ignore if localStorage fails
-        }
-
+        const version = manifest.version || 'latest';
+        // Cache the version
+        localStorage.setItem(cacheKey, version);
+        localStorage.setItem(cacheTimeKey, Date.now().toString());
         return version;
       })
       .catch(error => {
-        console.warn('[Mapsy Widget] Could not fetch manifest, using fallback');
-        // Use timestamp-based fallback
-        const fallbackVersion = 'cb' + Math.floor(Date.now() / 3600000); // Changes every hour
-        return fallbackVersion;
+        console.error('Failed to fetch widget manifest:', error);
+        // Fallback to cached or default
+        return cachedVersion || '1.0.0';
       });
   }
 
@@ -99,14 +80,9 @@
   }
 
   /**
-   * Load CSS dynamically
+   * Load CSS
    */
   function loadStyles(version) {
-    // Check if styles already loaded
-    if (document.querySelector('link[href*="mapsy-widget"][href*="style.css"]')) {
-      return;
-    }
-
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.type = 'text/css';
@@ -120,32 +96,43 @@
    * Initialize the widget
    */
   function initializeWidget(version) {
-    // Build URLs with version for cache busting
+    // Build widget URL with version for cache busting
     const widgetUrl = `${WIDGET_CONFIG.baseUrl}/mapsy-widget.min.js?v=${version}`;
 
-    console.log('[Mapsy Widget] Loading version:', version);
+    console.log('Loading Mapsy Widget version:', version);
 
-    // Load CSS first
+    // Load styles
     loadStyles(version);
 
     // Load the widget script
     loadScript(widgetUrl,
       function onSuccess() {
-        console.log('[Mapsy Widget] Loaded successfully');
+        console.log('Mapsy Widget loaded successfully');
         window.MapsyWidgetLoaded = true;
 
-        // Store version info
-        if (window.MapsyWidget) {
-          window.MapsyWidget._version = version;
-          window.MapsyWidget._loaderVersion = '1.0.0';
-        }
+        // Initialize widget if function exists
+        if (typeof window.MapsyWidget !== 'undefined' && typeof window.MapsyWidget.init === 'function') {
+          // Get config from script tag
+          const script = document.currentScript || document.querySelector('script[src*="mapsy-widget"]');
+          if (script) {
+            const config = {
+              container: script.getAttribute('data-container') || 'mapsy-widget',
+              apiUrl: script.getAttribute('data-api-url') || undefined
+            };
 
-        // Auto-initialize for all mapsy-widget elements
-        if (typeof window.MapsyWidget !== 'undefined' && typeof window.MapsyWidget.autoInit === 'function') {
-          // Small delay to ensure DOM is ready
-          setTimeout(function() {
-            window.MapsyWidget.autoInit();
-          }, 0);
+            // Auto-initialize for all mapsy-widget elements
+            const widgets = document.querySelectorAll('mapsy-widget');
+            if (widgets.length > 0) {
+              widgets.forEach((widget, index) => {
+                const widgetConfig = {
+                  ...config,
+                  container: widget,
+                  apiUrl: widget.getAttribute('data-api-url') || config.apiUrl
+                };
+                window.MapsyWidget.init(widgetConfig);
+              });
+            }
+          }
         }
 
         // Fire custom event
@@ -155,9 +142,8 @@
         window.dispatchEvent(event);
       },
       function onError() {
-        console.error('[Mapsy Widget] Failed to load widget script');
+        console.error('Failed to load Mapsy Widget');
 
-        // Fire error event
         const event = new CustomEvent('MapsyWidgetError', {
           detail: { message: 'Failed to load widget script' }
         });
@@ -170,8 +156,7 @@
    * Main execution
    */
   function loadWidget() {
-    // Get version and load widget
-    getWidgetVersion().then(function(version) {
+    getWidgetVersion().then(version => {
       initializeWidget(version);
     });
   }
@@ -186,26 +171,10 @@
   // Expose loader API
   window.MapsyWidgetLoader = {
     reload: function() {
-      // Clear cache
-      try {
-        localStorage.removeItem('mapsy-widget-version');
-        localStorage.removeItem('mapsy-widget-version-time');
-      } catch (e) {
-        // Ignore if localStorage fails
-      }
-      // Reset and reload
+      localStorage.removeItem('mapsy-widget-version');
+      localStorage.removeItem('mapsy-widget-version-time');
       window.MapsyWidgetLoaded = false;
-
-      // Remove existing script and styles
-      const existingScript = document.querySelector('script[src*="mapsy-widget.min.js"]');
-      const existingStyles = document.querySelector('link[href*="mapsy-widget"][href*="style.css"]');
-      if (existingScript) existingScript.remove();
-      if (existingStyles) existingStyles.remove();
-
       loadWidget();
-    },
-    getVersion: function() {
-      return window.MapsyWidget && window.MapsyWidget._version;
     },
     config: WIDGET_CONFIG
   };
