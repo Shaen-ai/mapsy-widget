@@ -53,15 +53,19 @@
       })
       .then(manifest => {
         console.log('[Mapsy Widget Loader] Manifest loaded:', manifest);
-        const version = manifest.version || 'latest';
-        return version;
+        return {
+          version: manifest.version || 'latest',
+          buildTime: manifest.buildTime || null
+        };
       })
       .catch(error => {
         console.error('[Mapsy Widget Loader] Failed to fetch manifest:', error);
         // Fallback to default version
-        const fallbackVersion = '1.0.0';
-        console.log('[Mapsy Widget Loader] Using fallback version:', fallbackVersion);
-        return fallbackVersion;
+        console.log('[Mapsy Widget Loader] Using fallback version:', '1.0.0');
+        return {
+          version: '1.0.0',
+          buildTime: null
+        };
       });
   }
 
@@ -83,11 +87,11 @@
   /**
    * Load CSS
    */
-  function loadStyles(version) {
+  function loadStyles(version, timestamp) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.type = 'text/css';
-    link.href = `${WIDGET_CONFIG.baseUrl}/style.css?v=${version}`;
+    link.href = `${WIDGET_CONFIG.baseUrl}/style.css?v=${version}&t=${timestamp}`;
 
     const target = document.head || document.getElementsByTagName('head')[0];
     target.appendChild(link);
@@ -96,14 +100,16 @@
   /**
    * Initialize the widget
    */
-  function initializeWidget(version) {
-    // Build widget URL with version for cache busting
-    const widgetUrl = `${WIDGET_CONFIG.baseUrl}/mapsy-widget.min.js?v=${version}`;
+  function initializeWidget(version, buildTime) {
+    // Build widget URL with version AND timestamp for cache busting
+    // This ensures fresh load when same version is re-deployed
+    const timestamp = buildTime ? new Date(buildTime).getTime() : Date.now();
+    const widgetUrl = `${WIDGET_CONFIG.baseUrl}/mapsy-widget.min.js?v=${version}&t=${timestamp}`;
 
     console.log('Loading Mapsy Widget version:', version);
 
-    // Load styles
-    loadStyles(version);
+    // Load styles with timestamp
+    loadStyles(version, timestamp);
 
     // Load the widget script
     loadScript(widgetUrl,
@@ -157,8 +163,8 @@
    * Main execution
    */
   function loadWidget() {
-    getWidgetVersion().then(version => {
-      initializeWidget(version);
+    getWidgetVersion().then(data => {
+      initializeWidget(data.version, data.buildTime);
     });
   }
 
