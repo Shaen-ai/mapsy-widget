@@ -8,6 +8,14 @@ export default defineConfig({
     port: 5174,
     host: true
   },
+  define: {
+    // Define global constants for browser environment
+    'process.env': {},
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    // Define any missing import.meta.env variables with defaults
+    'import.meta.env.VITE_API_URL': JSON.stringify(''),
+    'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify('')
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/widget-entry.tsx'),
@@ -26,6 +34,20 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: false,
     minify: false,
-    cssCodeSplit: false
+    cssCodeSplit: false,
+    // Ensure source maps are disabled in production
+    sourcemap: false
+  },
+  // Resolve aliases to prevent Node.js module imports
+  resolve: {
+    alias: {
+      // Prevent Node.js built-ins from being included
+      stream: 'stream-browserify',
+      path: 'path-browserify'
+    }
+  },
+  // Optimize deps
+  optimizeDeps: {
+    exclude: ['path', 'fs', 'stream']
   }
 });
