@@ -6,48 +6,94 @@
 (function() {
   const WIDGET_BASE_URL = document.currentScript.src.replace(/[^\/]*$/, '');
 
-  // Prevent caching by adding timestamp
-  const preventCache = () => '?t=' + new Date().getTime();
+  // Generate cache buster based on current time (changes every hour to balance caching and freshness)
+  const getCacheBuster = () => {
+    const now = new Date();
+    // Create a timestamp that changes every hour
+    const hourly = `${now.getFullYear()}${now.getMonth()}${now.getDate()}${now.getHours()}`;
+    return hourly;
+  };
 
-  // Load manifest with cache busting
+  // Prevent caching by adding timestamp
+  const preventCache = () => '?_t=' + new Date().getTime();
+
+  // Load manifest with cache busting - using simple request to avoid OPTIONS
   const loadManifest = async () => {
     try {
       const manifestUrl = WIDGET_BASE_URL + 'manifest.json' + preventCache();
-      const response = await fetch(manifestUrl, {
-        cache: 'no-cache',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+
+      // Use simple GET request - no custom headers to avoid OPTIONS preflight
+      const response = await fetch(manifestUrl);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch manifest');
+        throw new Error(`Failed to fetch manifest: ${response.status}`);
       }
 
-      return await response.json();
+      const manifest = await response.json();
+      console.log('[Mapsy Widget] Manifest loaded successfully');
+      return manifest;
     } catch (error) {
-      console.error('Error loading widget manifest:', error);
-      // Fallback to default version
-      return { version: 'latest' };
+      console.warn('[Mapsy Widget] Could not fetch manifest, using timestamp-based cache busting.');
+      console.warn('Error:', error.message);
+
+      // Return null to indicate manifest is not available
+      return null;
     }
   };
 
-  // Load CSS
-  const loadCSS = (version) => {
+  // Load CSS with proper cache busting
+  const loadCSS = (version, useTimestamp = false) => {
+    const existingCSS = document.querySelector(`link[href*="style.css"]`);
+    if (existingCSS) {
+      existingCSS.remove();
+    }
+
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = `${WIDGET_BASE_URL}style.css?v=${version}`;
+
+    // Use timestamp for cache busting if no version or if specified
+    if (useTimestamp || !version) {
+      // Use timestamp that changes every hour for reasonable caching
+      link.href = `${WIDGET_BASE_URL}style.css?_cb=${getCacheBuster()}`;
+    } else {
+      // Use version-based cache busting
+      link.href = `${WIDGET_BASE_URL}style.css?v=${version}`;
+    }
+
     document.head.appendChild(link);
   };
 
-  // Load the main widget script
-  const loadWidget = (version) => {
+  // Load the main widget script with proper cache busting
+  const loadWidget = (version, useTimestamp = false) => {
     return new Promise((resolve, reject) => {
+      const existingScript = document.querySelector(`script[src*="mapsy-widget.min.js"]`);
+      if (existingScript) {
+        existingScript.remove();
+      }
+
       const script = document.createElement('script');
-      script.src = `${WIDGET_BASE_URL}mapsy-widget.min.js?v=${version}`;
-      script.onload = resolve;
-      script.onerror = reject;
+
+      // Use timestamp for cache busting if no version or if specified
+      if (useTimestamp || !version) {
+        // Use timestamp that changes every hour for reasonable caching
+        script.src = `${WIDGET_BASE_URL}mapsy-widget.min.js?_cb=${getCacheBuster()}`;
+        console.log(`[Mapsy Widget] Loading with cache buster: ${getCacheBuster()}`);
+      } else {
+        // Use version-based cache busting
+        script.src = `${WIDGET_BASE_URL}mapsy-widget.min.js?v=${version}`;
+        console.log(`[Mapsy Widget] Loading version: ${version}`);
+      }
+
+      script.onload = () => {
+        console.log('[Mapsy Widget] Successfully loaded');
+        resolve();
+      };
+
+      script.onerror = (error) => {
+        console.error('[Mapsy Widget] Failed to load widget script:', error);
+        reject(error);
+      };
+
       document.head.appendChild(script);
     });
   };
@@ -55,27 +101,72 @@
   // Initialize
   const init = async () => {
     try {
-      // Load manifest
+      console.log('[Mapsy Widget] Initializing...');
+
+      // Try to load manifest
       const manifest = await loadManifest();
-      const version = manifest.version || 'latest';
 
-      console.log(`[Mapsy Widget] Loading version ${version}`);
-      console.log(`[Mapsy Widget] Build time: ${manifest.buildTime}`);
+      if (manifest && manifest.version) {
+        // Manifest loaded successfully - use version-based caching
+        const version = manifest.version;
 
-      // Load CSS
-      loadCSS(version);
+        console.log(`[Mapsy Widget] Using version: ${version}`);
+        if (manifest.buildTime) {
+          console.log(`[Mapsy Widget] Build time: ${manifest.buildTime}`);
+        }
 
-      // Load widget
-      await loadWidget(version);
+        // Load with version
+        loadCSS(version, false);
+        await loadWidget(version, false);
 
-      // Store version info globally
-      if (window.MapsyWidget) {
-        window.MapsyWidget._version = version;
-        window.MapsyWidget._manifest = manifest;
+        // Store version info globally
+        if (window.MapsyWidget) {
+          window.MapsyWidget._version = version;
+          window.MapsyWidget._manifest = manifest;
+          window.MapsyWidget._cacheMode = 'version';
+          console.log('[Mapsy Widget] Ready with version-based caching!');
+        }
+      } else {
+        // Manifest not available - use timestamp-based cache busting
+        console.log('[Mapsy Widget] Using timestamp-based cache busting (manifest unavailable)');
+
+        // Load with timestamp
+        loadCSS(null, true);
+        await loadWidget(null, true);
+
+        if (window.MapsyWidget) {
+          window.MapsyWidget._version = getCacheBuster();
+          window.MapsyWidget._manifest = {
+            version: getCacheBuster(),
+            mode: 'timestamp',
+            error: 'Manifest unavailable - using hourly cache refresh'
+          };
+          window.MapsyWidget._cacheMode = 'timestamp';
+          console.log('[Mapsy Widget] Ready with timestamp-based caching!');
+        }
       }
 
     } catch (error) {
       console.error('[Mapsy Widget] Failed to initialize:', error);
+
+      // Final fallback - try with aggressive cache busting
+      console.log('[Mapsy Widget] Attempting final fallback with timestamp...');
+      try {
+        loadCSS(null, true);
+        await loadWidget(null, true);
+
+        if (window.MapsyWidget) {
+          window.MapsyWidget._version = getCacheBuster();
+          window.MapsyWidget._manifest = {
+            version: getCacheBuster(),
+            error: 'Fallback mode active'
+          };
+          window.MapsyWidget._cacheMode = 'timestamp-fallback';
+          console.log('[Mapsy Widget] Loaded in fallback mode');
+        }
+      } catch (fallbackError) {
+        console.error('[Mapsy Widget] Complete failure. Unable to load widget.', fallbackError);
+      }
     }
   };
 
