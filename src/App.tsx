@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
 import { Location } from './types/location';
-import { locationService, widgetConfigService } from './services/api';
+import { locationService, widgetConfigService, initializeApi } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
 
 interface WidgetConfig {
@@ -13,7 +13,12 @@ interface WidgetConfig {
   primaryColor?: string;
 }
 
-function App() {
+interface AppProps {
+  apiUrl?: string;
+  config?: Partial<WidgetConfig>;
+}
+
+function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,20 +31,30 @@ function App() {
     headerTitle: 'Our Locations',
     mapZoomLevel: 12,
     primaryColor: '#3B82F6',
+    ...externalConfig,
   });
 
   useEffect(() => {
+    // Initialize API with provided URL if any
+    if (apiUrl) {
+      initializeApi(apiUrl);
+    }
+
     fetchConfig();
     fetchLocations();
-  }, []);
+  }, [apiUrl]);
 
   const fetchConfig = async () => {
     try {
       const configData = await widgetConfigService.getConfig();
-      setConfig(configData);
-      setCurrentView(configData.defaultView || 'map');
+      // Merge external config with fetched config
+      const mergedConfig = { ...configData, ...externalConfig };
+      setConfig(mergedConfig);
+      setCurrentView(mergedConfig.defaultView || 'map');
     } catch (error) {
-      console.error('Error fetching widget config:', error);
+      console.error('Error fetching widget config, using defaults:', error);
+      // Use external config or defaults if fetch fails
+      setCurrentView(config.defaultView || 'map');
     }
   };
 

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapsy Widget Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .info h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .info code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        #mapsy-widget {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-height: 500px;
+        }
+        .version-info {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="info">
+            <h2>Mapsy Widget Test Page</h2>
+            <p>This page demonstrates the Mapsy widget with automatic version detection.</p>
+            <p>Widget Version: <span class="version-info" id="widget-version">Loading...</span></p>
+            <p>The widget automatically loads its version from <code>manifest.json</code> on initialization.</p>
+        </div>
+
+        <div id="mapsy-widget"></div>
+    </div>
+
+    <!-- Load CSS -->
+    <link rel="stylesheet" href="dist/style.css">
+
+    <!-- Load the widget (can use either minified or non-minified version) -->
+    <script src="dist/mapsy-widget.min.js"></script>
+
+    <script>
+        // Wait for the widget to be available
+        window.addEventListener('DOMContentLoaded', function() {
+            // Initialize the widget
+            if (window.MapsyWidget) {
+                window.MapsyWidget.init('#mapsy-widget', {
+                    // Add any configuration options here
+                    apiUrl: 'http://localhost:8000/api'
+                });
+
+                // Display the version after a short delay to allow manifest fetch
+                setTimeout(function() {
+                    document.getElementById('widget-version').textContent =
+                        window.MapsyWidget.version || 'Unknown';
+                }, 500);
+            } else {
+                console.error('MapsyWidget not loaded');
+            }
+        });
+    </script>
+</body>
+</html>

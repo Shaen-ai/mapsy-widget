@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapsy Widget - Simple Integration</title>
+    <!-- Load Widget CSS -->
+    <link rel="stylesheet" href="https://your-cdn.com/mapsy-widget/style.css">
+</head>
+<body>
+    <h1>Your Website</h1>
+
+    <!-- Method 1: Simplest - Just add the tag -->
+    <mapsy-widget></mapsy-widget>
+
+    <!-- Method 2: With configuration via data attributes -->
+    <mapsy-widget
+        data-api-url="https://api.yoursite.com/api"
+        data-default-view="list"
+        data-header-title="Our Locations">
+    </mapsy-widget>
+
+    <!-- Method 3: With JSON config -->
+    <mapsy-widget data-config='{"defaultView":"map","headerTitle":"Store Finder"}'></mapsy-widget>
+
+    <!-- Load Widget JavaScript (automatically finds and initializes all mapsy-widget elements) -->
+    <script src="https://your-cdn.com/mapsy-widget/mapsy-widget.min.js"></script>
+</body>
+</html>

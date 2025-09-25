@@ -27,7 +27,7 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: npm ci
+        run: npm i
 
       - name: Build Widget
         run: npm run build
@@ -50,18 +50,14 @@ jobs:
           mkdir -p ~/.ssh
           echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
-          # Remove existing files on remote server
-          sshpass -p "$PASSWORD" ssh $USERNAME@$HOST "sudo rm -rf $TARGET_DIR/*"
-
           # Copy build files to remote server
           sshpass -p "$PASSWORD" scp -r dist/* $USERNAME@$HOST:/tmp/widget-dist/
 
           # Move files to target directory and set permissions
           sshpass -p "$PASSWORD" ssh $USERNAME@$HOST "
-            sudo mkdir -p $TARGET_DIR
-            sudo mv /tmp/widget-dist/* $TARGET_DIR/
-            sudo chown -R www-data:www-data $TARGET_DIR
-            sudo chmod -R 755 $TARGET_DIR
+            rm -rf $TARGET_DIR/*
+            mv /tmp/widget-dist/* $TARGET_DIR/
+            chown -R www-data:www-data $TARGET_DIR
             rm -rf /tmp/widget-dist
           "
 
