@@ -1,175 +1,213 @@
 /**
  * Mapsy Widget Loader
- * This script fetches the manifest and loads the appropriate versioned widget
+ * Simplified loader based on working yoga widget approach
  */
-
 (function() {
-  const WIDGET_BASE_URL = document.currentScript.src.replace(/[^\/]*$/, '');
+  'use strict';
 
-  // Generate cache buster based on current time (changes every hour to balance caching and freshness)
-  const getCacheBuster = () => {
-    const now = new Date();
-    // Create a timestamp that changes every hour
-    const hourly = `${now.getFullYear()}${now.getMonth()}${now.getDate()}${now.getHours()}`;
-    return hourly;
+  // Configuration
+  const WIDGET_CONFIG = {
+    baseUrl: '', // Will be auto-detected from script location
+    cacheTimeout: 3600000, // 1 hour in milliseconds
+    manifestPath: '/manifest.json'
   };
 
-  // Prevent caching by adding timestamp
-  const preventCache = () => '?_t=' + new Date().getTime();
+  // Auto-detect base URL from current script
+  const currentScript = document.currentScript || document.querySelector('script[src*="mapsy-widget"]');
+  if (currentScript) {
+    WIDGET_CONFIG.baseUrl = currentScript.src.replace(/[^\/]*$/, '').replace(/\/$/, '');
+  }
 
-  // Load manifest with cache busting - using simple request to avoid OPTIONS
-  const loadManifest = async () => {
+  // Check if widget is already loaded
+  if (window.MapsyWidgetLoaded) {
+    console.log('[Mapsy Widget] Already loaded');
+    return;
+  }
+
+  /**
+   * Get widget version from manifest with localStorage caching
+   */
+  function getWidgetVersion() {
+    const cacheKey = 'mapsy-widget-version';
+    const cacheTimeKey = 'mapsy-widget-version-time';
+
+    // Check localStorage cache first
     try {
-      const manifestUrl = WIDGET_BASE_URL + 'manifest.json' + preventCache();
+      const cachedVersion = localStorage.getItem(cacheKey);
+      const cacheTime = localStorage.getItem(cacheTimeKey);
 
-      // Use simple GET request - no custom headers to avoid OPTIONS preflight
-      const response = await fetch(manifestUrl);
+      if (cachedVersion && cacheTime) {
+        const now = Date.now();
+        const timeDiff = now - parseInt(cacheTime);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch manifest: ${response.status}`);
+        // Use cache if it's still valid
+        if (timeDiff < WIDGET_CONFIG.cacheTimeout) {
+          console.log('[Mapsy Widget] Using cached version:', cachedVersion);
+          return Promise.resolve(cachedVersion);
+        }
       }
-
-      const manifest = await response.json();
-      console.log('[Mapsy Widget] Manifest loaded successfully');
-      return manifest;
-    } catch (error) {
-      console.warn('[Mapsy Widget] Could not fetch manifest, using timestamp-based cache busting.');
-      console.warn('Error:', error.message);
-
-      // Return null to indicate manifest is not available
-      return null;
+    } catch (e) {
+      // localStorage might not be available
+      console.warn('[Mapsy Widget] localStorage not available');
     }
-  };
 
-  // Load CSS with proper cache busting
-  const loadCSS = (version, useTimestamp = false) => {
-    const existingCSS = document.querySelector(`link[href*="style.css"]`);
-    if (existingCSS) {
-      existingCSS.remove();
+    // Fetch latest version from manifest - simple fetch, no special headers
+    const manifestUrl = WIDGET_CONFIG.baseUrl + WIDGET_CONFIG.manifestPath;
+
+    return fetch(manifestUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Manifest not found');
+        }
+        return response.json();
+      })
+      .then(manifest => {
+        const version = manifest.version || '1.0.0';
+        console.log('[Mapsy Widget] Fetched version from manifest:', version);
+
+        // Cache the version in localStorage
+        try {
+          localStorage.setItem(cacheKey, version);
+          localStorage.setItem(cacheTimeKey, Date.now().toString());
+        } catch (e) {
+          // Ignore if localStorage fails
+        }
+
+        return version;
+      })
+      .catch(error => {
+        console.warn('[Mapsy Widget] Could not fetch manifest, using fallback');
+        // Use timestamp-based fallback
+        const fallbackVersion = 'cb' + Math.floor(Date.now() / 3600000); // Changes every hour
+        return fallbackVersion;
+      });
+  }
+
+  /**
+   * Load script dynamically
+   */
+  function loadScript(src, onLoad, onError) {
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.async = true;
+    script.src = src;
+    script.onload = onLoad;
+    script.onerror = onError;
+
+    const target = document.head || document.getElementsByTagName('head')[0] || document.body;
+    target.appendChild(script);
+  }
+
+  /**
+   * Load CSS dynamically
+   */
+  function loadStyles(version) {
+    // Check if styles already loaded
+    if (document.querySelector('link[href*="mapsy-widget"][href*="style.css"]')) {
+      return;
     }
 
     const link = document.createElement('link');
     link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = `${WIDGET_CONFIG.baseUrl}/style.css?v=${version}`;
 
-    // Use timestamp for cache busting if no version or if specified
-    if (useTimestamp || !version) {
-      // Use timestamp that changes every hour for reasonable caching
-      link.href = `${WIDGET_BASE_URL}style.css?_cb=${getCacheBuster()}`;
-    } else {
-      // Use version-based cache busting
-      link.href = `${WIDGET_BASE_URL}style.css?v=${version}`;
-    }
+    const target = document.head || document.getElementsByTagName('head')[0];
+    target.appendChild(link);
+  }
 
-    document.head.appendChild(link);
-  };
+  /**
+   * Initialize the widget
+   */
+  function initializeWidget(version) {
+    // Build URLs with version for cache busting
+    const widgetUrl = `${WIDGET_CONFIG.baseUrl}/mapsy-widget.min.js?v=${version}`;
 
-  // Load the main widget script with proper cache busting
-  const loadWidget = (version, useTimestamp = false) => {
-    return new Promise((resolve, reject) => {
-      const existingScript = document.querySelector(`script[src*="mapsy-widget.min.js"]`);
-      if (existingScript) {
-        existingScript.remove();
-      }
+    console.log('[Mapsy Widget] Loading version:', version);
 
-      const script = document.createElement('script');
+    // Load CSS first
+    loadStyles(version);
 
-      // Use timestamp for cache busting if no version or if specified
-      if (useTimestamp || !version) {
-        // Use timestamp that changes every hour for reasonable caching
-        script.src = `${WIDGET_BASE_URL}mapsy-widget.min.js?_cb=${getCacheBuster()}`;
-        console.log(`[Mapsy Widget] Loading with cache buster: ${getCacheBuster()}`);
-      } else {
-        // Use version-based cache busting
-        script.src = `${WIDGET_BASE_URL}mapsy-widget.min.js?v=${version}`;
-        console.log(`[Mapsy Widget] Loading version: ${version}`);
-      }
+    // Load the widget script
+    loadScript(widgetUrl,
+      function onSuccess() {
+        console.log('[Mapsy Widget] Loaded successfully');
+        window.MapsyWidgetLoaded = true;
 
-      script.onload = () => {
-        console.log('[Mapsy Widget] Successfully loaded');
-        resolve();
-      };
-
-      script.onerror = (error) => {
-        console.error('[Mapsy Widget] Failed to load widget script:', error);
-        reject(error);
-      };
-
-      document.head.appendChild(script);
-    });
-  };
-
-  // Initialize
-  const init = async () => {
-    try {
-      console.log('[Mapsy Widget] Initializing...');
-
-      // Try to load manifest
-      const manifest = await loadManifest();
-
-      if (manifest && manifest.version) {
-        // Manifest loaded successfully - use version-based caching
-        const version = manifest.version;
-
-        console.log(`[Mapsy Widget] Using version: ${version}`);
-        if (manifest.buildTime) {
-          console.log(`[Mapsy Widget] Build time: ${manifest.buildTime}`);
-        }
-
-        // Load with version
-        loadCSS(version, false);
-        await loadWidget(version, false);
-
-        // Store version info globally
+        // Store version info
         if (window.MapsyWidget) {
           window.MapsyWidget._version = version;
-          window.MapsyWidget._manifest = manifest;
-          window.MapsyWidget._cacheMode = 'version';
-          console.log('[Mapsy Widget] Ready with version-based caching!');
+          window.MapsyWidget._loaderVersion = '1.0.0';
         }
-      } else {
-        // Manifest not available - use timestamp-based cache busting
-        console.log('[Mapsy Widget] Using timestamp-based cache busting (manifest unavailable)');
 
-        // Load with timestamp
-        loadCSS(null, true);
-        await loadWidget(null, true);
-
-        if (window.MapsyWidget) {
-          window.MapsyWidget._version = getCacheBuster();
-          window.MapsyWidget._manifest = {
-            version: getCacheBuster(),
-            mode: 'timestamp',
-            error: 'Manifest unavailable - using hourly cache refresh'
-          };
-          window.MapsyWidget._cacheMode = 'timestamp';
-          console.log('[Mapsy Widget] Ready with timestamp-based caching!');
+        // Auto-initialize for all mapsy-widget elements
+        if (typeof window.MapsyWidget !== 'undefined' && typeof window.MapsyWidget.autoInit === 'function') {
+          // Small delay to ensure DOM is ready
+          setTimeout(function() {
+            window.MapsyWidget.autoInit();
+          }, 0);
         }
+
+        // Fire custom event
+        const event = new CustomEvent('MapsyWidgetReady', {
+          detail: { version: version }
+        });
+        window.dispatchEvent(event);
+      },
+      function onError() {
+        console.error('[Mapsy Widget] Failed to load widget script');
+
+        // Fire error event
+        const event = new CustomEvent('MapsyWidgetError', {
+          detail: { message: 'Failed to load widget script' }
+        });
+        window.dispatchEvent(event);
       }
+    );
+  }
 
-    } catch (error) {
-      console.error('[Mapsy Widget] Failed to initialize:', error);
+  /**
+   * Main execution
+   */
+  function loadWidget() {
+    // Get version and load widget
+    getWidgetVersion().then(function(version) {
+      initializeWidget(version);
+    });
+  }
 
-      // Final fallback - try with aggressive cache busting
-      console.log('[Mapsy Widget] Attempting final fallback with timestamp...');
+  // Start loading
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadWidget);
+  } else {
+    loadWidget();
+  }
+
+  // Expose loader API
+  window.MapsyWidgetLoader = {
+    reload: function() {
+      // Clear cache
       try {
-        loadCSS(null, true);
-        await loadWidget(null, true);
-
-        if (window.MapsyWidget) {
-          window.MapsyWidget._version = getCacheBuster();
-          window.MapsyWidget._manifest = {
-            version: getCacheBuster(),
-            error: 'Fallback mode active'
-          };
-          window.MapsyWidget._cacheMode = 'timestamp-fallback';
-          console.log('[Mapsy Widget] Loaded in fallback mode');
-        }
-      } catch (fallbackError) {
-        console.error('[Mapsy Widget] Complete failure. Unable to load widget.', fallbackError);
+        localStorage.removeItem('mapsy-widget-version');
+        localStorage.removeItem('mapsy-widget-version-time');
+      } catch (e) {
+        // Ignore if localStorage fails
       }
-    }
+      // Reset and reload
+      window.MapsyWidgetLoaded = false;
+
+      // Remove existing script and styles
+      const existingScript = document.querySelector('script[src*="mapsy-widget.min.js"]');
+      const existingStyles = document.querySelector('link[href*="mapsy-widget"][href*="style.css"]');
+      if (existingScript) existingScript.remove();
+      if (existingStyles) existingStyles.remove();
+
+      loadWidget();
+    },
+    getVersion: function() {
+      return window.MapsyWidget && window.MapsyWidget._version;
+    },
+    config: WIDGET_CONFIG
   };
 
-  // Start initialization
-  init();
 })();
