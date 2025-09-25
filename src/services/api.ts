@@ -4,7 +4,7 @@ import { Location } from '../types/location';
 let apiInstance: AxiosInstance;
 
 export const initializeApi = (apiUrl?: string) => {
-  const baseURL = apiUrl || import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const baseURL = apiUrl || import.meta.env.VITE_API_URL || 'https://mapsy-api.nextechspires.com/api';
 
   apiInstance = axios.create({
     baseURL,

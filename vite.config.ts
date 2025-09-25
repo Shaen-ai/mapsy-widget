@@ -12,9 +12,6 @@ export default defineConfig({
     // Define global constants for browser environment
     'process.env': {},
     'process.env.NODE_ENV': JSON.stringify('production'),
-    // Define any missing import.meta.env variables with defaults
-    'import.meta.env.VITE_API_URL': JSON.stringify(''),
-    'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify('')
   },
   build: {
     lib: {
