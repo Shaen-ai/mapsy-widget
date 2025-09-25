@@ -9,16 +9,27 @@
   const WIDGET_CONFIG = {
     baseUrl: '', // Will be auto-detected
     cacheTimeout: 3600000, // 1 hour
-    manifestPath: '/widget-manifest.json' // Matching yoga widget
   };
 
   // Auto-detect base URL from current script
   const currentScript = document.currentScript || document.querySelector('script[src*="mapsy-widget"]');
-  if (currentScript) {
+  if (currentScript && currentScript.src) {
     // Get base URL without the script name
     const scriptUrl = currentScript.src;
-    WIDGET_CONFIG.baseUrl = scriptUrl.substring(0, scriptUrl.lastIndexOf('/'));
+    const lastSlash = scriptUrl.lastIndexOf('/');
+    WIDGET_CONFIG.baseUrl = scriptUrl.substring(0, lastSlash);
+    // For production, manifest is in the same directory as the loader
+    WIDGET_CONFIG.manifestPath = WIDGET_CONFIG.baseUrl + '/widget-manifest.json';
+  } else {
+    // If we can't detect the script URL, default to current directory
+    WIDGET_CONFIG.baseUrl = '.';
+    WIDGET_CONFIG.manifestPath = './widget-manifest.json';
   }
+
+  // Log configuration for debugging
+  console.log('[Mapsy Widget Loader] Base URL:', WIDGET_CONFIG.baseUrl);
+  console.log('[Mapsy Widget Loader] Manifest Path:', WIDGET_CONFIG.manifestPath);
+  console.log('[Mapsy Widget Loader] Current Script:', currentScript?.src || 'Not detected');
 
   // Check if widget is already loaded
   if (window.MapsyWidgetLoaded) {
@@ -48,9 +59,18 @@
     }
 
     // Fetch latest version from manifest - exactly like yoga widget
-    return fetch(WIDGET_CONFIG.baseUrl + WIDGET_CONFIG.manifestPath)
-      .then(response => response.json())
+    const manifestUrl = WIDGET_CONFIG.manifestPath;
+    console.log('[Mapsy Widget Loader] Fetching manifest from:', manifestUrl);
+
+    return fetch(manifestUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
       .then(manifest => {
+        console.log('[Mapsy Widget Loader] Manifest loaded:', manifest);
         const version = manifest.version || 'latest';
         // Cache the version
         localStorage.setItem(cacheKey, version);
@@ -58,9 +78,11 @@
         return version;
       })
       .catch(error => {
-        console.error('Failed to fetch widget manifest:', error);
+        console.error('[Mapsy Widget Loader] Failed to fetch manifest:', error);
         // Fallback to cached or default
-        return cachedVersion || '1.0.0';
+        const fallbackVersion = cachedVersion || '1.0.0';
+        console.log('[Mapsy Widget Loader] Using fallback version:', fallbackVersion);
+        return fallbackVersion;
       });
   }
 

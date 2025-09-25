@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Widget Loader</title>
+</head>
+<body>
+    <h1>Testing Mapsy Widget Loader</h1>
+    <div id="mapsy-widget"></div>
+
+    <!-- Test the loader directly from dist -->
+    <script src="./dist/mapsy-widget.js"></script>
+
+    <script>
+        // Listen for widget events
+        window.addEventListener('MapsyWidgetReady', function(e) {
+            console.log('Widget Ready!', e.detail);
+        });
+
+        window.addEventListener('MapsyWidgetError', function(e) {
+            console.error('Widget Error!', e.detail);
+        });
+
+        // Debug: Check what's happening
+        setTimeout(() => {
+            console.log('Widget Loader Config:', window.MapsyWidgetLoader?.config);
+            console.log('Widget Loaded?', window.MapsyWidgetLoaded);
+
+            // Check localStorage
+            console.log('Cached version:', localStorage.getItem('mapsy-widget-version'));
+        }, 1000);
+
+        // Also manually test fetching the manifest
+        fetch('./dist/widget-manifest.json')
+            .then(r => r.json())
+            .then(data => console.log('Manual manifest fetch:', data))
+            .catch(err => console.error('Manual manifest fetch error:', err));
+    </script>
+</body>
+</html>
