@@ -22,8 +22,11 @@ const MapView: React.FC<MapViewProps> = ({
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
   useEffect(() => {
+    // HARDCODED GOOGLE MAPS API KEY - DO NOT CHANGE
+    const GOOGLE_MAPS_API_KEY = 'AIzaSyAU-ogdEZffsjmKb6PH8WjlSRr-Fuw9ti8';
+
     const loader = new Loader({
-      apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+      apiKey: GOOGLE_MAPS_API_KEY,
       version: 'weekly',
     });
 

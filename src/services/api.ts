@@ -3,8 +3,12 @@ import { Location } from '../types/location';
 
 let apiInstance: AxiosInstance;
 
+// HARDCODED PRODUCTION API URL - DO NOT CHANGE
+const PRODUCTION_API_URL = 'https://mapsy-api.nextechspires.com/api';
+
 export const initializeApi = (apiUrl?: string) => {
-  const baseURL = apiUrl || import.meta.env.VITE_API_URL || 'https://mapsy-api.nextechspires.com/api';
+  // Always use production URL unless explicitly overridden
+  const baseURL = apiUrl || PRODUCTION_API_URL;
 
   apiInstance = axios.create({
     baseURL,
@@ -14,7 +18,7 @@ export const initializeApi = (apiUrl?: string) => {
   });
 };
 
-// Initialize with default
+// Initialize with production URL
 initializeApi();
 
 export const locationService = {
