@@ -8,7 +8,6 @@
   // Configuration
   const WIDGET_CONFIG = {
     baseUrl: '', // Will be auto-detected
-    cacheTimeout: 3600000, // 1 hour
   };
 
   // Auto-detect base URL from current script
@@ -38,29 +37,12 @@
   }
 
   /**
-   * Get widget version from manifest with localStorage caching
+   * Get widget version from manifest - always fetch fresh
    */
   function getWidgetVersion() {
-    const cacheKey = 'mapsy-widget-version';
-    const cacheTimeKey = 'mapsy-widget-version-time';
-
-    // Check localStorage cache first
-    const cachedVersion = localStorage.getItem(cacheKey);
-    const cacheTime = localStorage.getItem(cacheTimeKey);
-
-    if (cachedVersion && cacheTime) {
-      const now = Date.now();
-      const timeDiff = now - parseInt(cacheTime);
-
-      // Use cache if still valid
-      if (timeDiff < WIDGET_CONFIG.cacheTimeout) {
-        return Promise.resolve(cachedVersion);
-      }
-    }
-
-    // Fetch latest version from manifest - exactly like yoga widget
-    const manifestUrl = WIDGET_CONFIG.manifestPath;
-    console.log('[Mapsy Widget Loader] Fetching manifest from:', manifestUrl);
+    // Always fetch fresh manifest with cache-busting parameter
+    const manifestUrl = WIDGET_CONFIG.manifestPath + '?t=' + Date.now();
+    console.log('[Mapsy Widget Loader] Fetching fresh manifest from:', manifestUrl);
 
     return fetch(manifestUrl)
       .then(response => {
@@ -72,15 +54,12 @@
       .then(manifest => {
         console.log('[Mapsy Widget Loader] Manifest loaded:', manifest);
         const version = manifest.version || 'latest';
-        // Cache the version
-        localStorage.setItem(cacheKey, version);
-        localStorage.setItem(cacheTimeKey, Date.now().toString());
         return version;
       })
       .catch(error => {
         console.error('[Mapsy Widget Loader] Failed to fetch manifest:', error);
-        // Fallback to cached or default
-        const fallbackVersion = cachedVersion || '1.0.0';
+        // Fallback to default version
+        const fallbackVersion = '1.0.0';
         console.log('[Mapsy Widget Loader] Using fallback version:', fallbackVersion);
         return fallbackVersion;
       });
@@ -193,8 +172,7 @@
   // Expose loader API
   window.MapsyWidgetLoader = {
     reload: function() {
-      localStorage.removeItem('mapsy-widget-version');
-      localStorage.removeItem('mapsy-widget-version-time');
+      // Force reload by resetting loaded flag
       window.MapsyWidgetLoaded = false;
       loadWidget();
     },
