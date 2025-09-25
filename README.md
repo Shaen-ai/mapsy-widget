@@ -1,29 +1,38 @@
 # Mapsy Widget
 
-A self-contained location widget that automatically initializes on any webpage.
+A self-contained location widget with automatic version management and cache busting.
 
 ## Quick Start
 
-Add the widget to any webpage with just two lines:
+Add the widget to any webpage with just one script:
 
 ```html
-<link rel="stylesheet" href="path/to/mapsy-widget/style.css">
-<script src="path/to/mapsy-widget/mapsy-widget.min.js"></script>
-```
+<!-- The loader automatically handles CSS and versioning -->
+<script src="https://your-cdn.com/mapsy-widget-loader.js"></script>
 
-Then add the widget element anywhere on your page:
-
-```html
+<!-- Add widget elements anywhere on your page -->
 <mapsy-widget></mapsy-widget>
 ```
 
-The widget will **automatically** find and initialize all `<mapsy-widget>` elements when the page loads.
+## How It Works
+
+The widget uses a smart loading system to ensure users always get the latest version:
+
+1. **`mapsy-widget-loader.js`** (1.2KB) - The main entry point
+2. Fetches **`manifest.json`** with cache-busting to get current version
+3. Loads **`mapsy-widget.min.js?v={version}`** - The actual widget code
+4. Loads **`style.css?v={version}`** - Widget styles
+5. Auto-initializes all `<mapsy-widget>` elements on the page
+
+### Benefits:
+- ✅ **Always Fresh**: Users automatically get the latest version after you deploy
+- ✅ **No Cache Issues**: Version-based query parameters ensure proper caching
+- ✅ **Small Initial Load**: Loader is only 1.2KB
+- ✅ **CDN Friendly**: Leverages browser caching for unchanged versions
 
 ## Configuration Options
 
 ### Method 1: Data Attributes
-
-Configure the widget using data attributes:
 
 ```html
 <mapsy-widget
@@ -37,8 +46,6 @@ Configure the widget using data attributes:
 ```
 
 ### Method 2: JSON Configuration
-
-Use a single `data-config` attribute with JSON:
 
 ```html
 <mapsy-widget data-config='{
@@ -54,17 +61,18 @@ Use a single `data-config` attribute with JSON:
 
 ### Method 3: JavaScript Initialization
 
-Manually initialize widgets with JavaScript:
-
 ```html
 <div id="my-widget"></div>
 
 <script>
-    window.MapsyWidget.init('#my-widget', {
-        apiUrl: 'https://api.example.com/api',
-        defaultView: 'map',
-        showHeader: true,
-        headerTitle: 'Custom Widget'
+    // Wait for widget to load
+    window.addEventListener('load', () => {
+        window.MapsyWidget.init('#my-widget', {
+            apiUrl: 'https://api.example.com/api',
+            defaultView: 'map',
+            showHeader: true,
+            headerTitle: 'Custom Widget'
+        });
     });
 </script>
 ```
@@ -80,47 +88,81 @@ Manually initialize widgets with JavaScript:
 | `mapZoomLevel` | number | `12` | Initial map zoom level |
 | `primaryColor` | string | `'#3B82F6'` | Primary theme color |
 
-## Multiple Widgets
+## Build System
 
-You can have multiple widgets on the same page:
+### Files Generated
 
-```html
-<!-- Widget 1: Map View -->
-<mapsy-widget data-default-view="map" data-header-title="Map"></mapsy-widget>
-
-<!-- Widget 2: List View -->
-<mapsy-widget data-default-view="list" data-header-title="List"></mapsy-widget>
+```
+dist/
+├── manifest.json              # Version and build info
+├── mapsy-widget-loader.js     # Main entry point (1.2KB)
+├── mapsy-widget.js            # Development version
+├── mapsy-widget.min.js        # Production version (500KB)
+├── mapsy-widget-{version}.min.js  # Versioned copy
+├── style.css                  # Widget styles
+└── style-{version}.css        # Versioned styles
 ```
 
-## Build Files
-
-The build process generates three files:
-
-- **`manifest.json`** - Contains version and build information
-- **`mapsy-widget.js`** - Non-minified version (for development)
-- **`mapsy-widget.min.js`** - Minified version (for production)
-- **`style.css`** - Widget styles
-
-## Version Tracking
-
-The widget automatically fetches its version from `manifest.json`:
-
-```javascript
-console.log(window.MapsyWidget.version); // "1.0.3"
-```
-
-## Building from Source
+### Building from Source
 
 ```bash
 # Install dependencies
 npm install
 
-# Build the widget (increments version automatically)
+# Build the widget (auto-increments version)
 npm run build
 
 # Development mode
 npm run dev
 ```
+
+### Version Management
+
+Each build automatically:
+1. Increments the patch version (e.g., 1.0.3 → 1.0.4)
+2. Updates `manifest.json` with new version and build time
+3. Creates versioned file copies
+4. Ensures cache busting on deployment
+
+## Deployment
+
+### CDN Deployment
+
+1. Upload all files from `dist/` to your CDN
+2. Use `mapsy-widget-loader.js` as the script source
+3. The loader handles everything else automatically
+
+### Cache Headers (Recommended)
+
+Configure your CDN/server with these cache headers:
+
+```
+# Loader and manifest - short cache or no-cache
+mapsy-widget-loader.js: Cache-Control: max-age=300
+manifest.json: Cache-Control: no-cache
+
+# Versioned files - long cache
+mapsy-widget.min.js: Cache-Control: max-age=31536000
+style.css: Cache-Control: max-age=31536000
+```
+
+## API Methods
+
+### `window.MapsyWidget.init(selector?, config?)`
+Initialize widget(s). If no selector provided, auto-initializes all `<mapsy-widget>` elements.
+
+### `window.MapsyWidget.autoInit()`
+Manually trigger auto-initialization.
+
+### `window.MapsyWidget.version`
+Get the current widget version.
+
+## Testing
+
+Use the included test files:
+- `test-cache-busting.html` - Test version loading and cache busting
+- `test-auto-widget.html` - Test auto-initialization
+- `integration.html` - Simple integration example
 
 ## Browser Support
 
@@ -129,23 +171,22 @@ npm run dev
 - Safari (latest)
 - Mobile browsers
 
-## API Methods
+## Troubleshooting
 
-### `window.MapsyWidget.init(selector?, config?)`
+### Widget Not Loading?
 
-Initialize widget(s). If no selector is provided, auto-initializes all `<mapsy-widget>` elements.
+Check browser console for errors and verify:
+1. `mapsy-widget-loader.js` is accessible
+2. `manifest.json` is in the same directory
+3. CORS headers are configured if loading from different domain
 
-### `window.MapsyWidget.autoInit()`
+### Old Version Still Showing?
 
-Manually trigger auto-initialization of all `<mapsy-widget>` elements.
+The loader prevents this, but if issues persist:
+1. Clear browser cache
+2. Check CDN cache settings
+3. Verify manifest.json is not cached
 
-### `window.MapsyWidget.version`
+## License
 
-Get the current widget version.
-
-## Examples
-
-Check the following example files:
-- `test-widget.html` - Basic integration test
-- `test-auto-widget.html` - Comprehensive examples
-- `integration-example.html` - Simple integration template
+MIT

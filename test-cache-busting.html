@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapsy Widget - Cache Busting Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .info-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .info-panel h2 {
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .info-label {
+            font-weight: 600;
+            min-width: 150px;
+            color: #666;
+        }
+        .info-value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            background: #f8f8f8;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-loading {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-loaded {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        mapsy-widget {
+            display: block;
+            min-height: 500px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .network-log {
+            background: #1e293b;
+            color: #94a3b8;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #334155;
+        }
+        .log-time {
+            color: #60a5fa;
+            margin-right: 10px;
+        }
+        .log-url {
+            color: #34d399;
+        }
+        .log-version {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="info-panel">
+            <h2>🚀 Mapsy Widget Cache Busting Test</h2>
+
+            <div class="info-item">
+                <span class="info-label">Widget Status:</span>
+                <span class="status-badge status-loading" id="status">Loading...</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">Version:</span>
+                <span class="info-value" id="version">-</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">Build Time:</span>
+                <span class="info-value" id="build-time">-</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">Manifest URL:</span>
+                <span class="info-value" id="manifest-url">-</span>
+            </div>
+
+            <div class="controls">
+                <button onclick="reloadWidget()">🔄 Reload Widget</button>
+                <button onclick="clearLogs()">🗑️ Clear Logs</button>
+                <button onclick="showManifest()">📋 Show Manifest</button>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h3>How it works:</h3>
+            <ol>
+                <li><strong>mapsy-widget-loader.js</strong> is loaded (small ~1KB file)</li>
+                <li>Loader fetches <strong>manifest.json</strong> with cache-busting (?t=timestamp)</li>
+                <li>Loader reads the version from manifest</li>
+                <li>Loader dynamically loads <strong>mapsy-widget.min.js?v={version}</strong></li>
+                <li>Loader dynamically loads <strong>style.css?v={version}</strong></li>
+                <li>Widget auto-initializes all &lt;mapsy-widget&gt; elements</li>
+            </ol>
+            <p><strong>Result:</strong> Users always get the latest version after rebuild, no manual cache clearing needed!</p>
+        </div>
+
+        <!-- Widget will be auto-initialized -->
+        <mapsy-widget data-api-url="http://localhost:8000/api"></mapsy-widget>
+
+        <div class="network-log" id="network-log">
+            <div style="color: #60a5fa; font-weight: bold; margin-bottom: 10px;">📡 Network Activity Log:</div>
+        </div>
+    </div>
+
+    <script>
+        // Intercept fetch to log network activity
+        const originalFetch = window.fetch;
+        const networkLog = [];
+
+        window.fetch = function(...args) {
+            const url = args[0];
+            const timestamp = new Date().toLocaleTimeString();
+
+            // Log the request
+            if (url.includes('manifest.json') || url.includes('mapsy-widget')) {
+                const logEntry = {
+                    time: timestamp,
+                    url: url,
+                    type: url.includes('manifest') ? 'manifest' : 'widget'
+                };
+                networkLog.push(logEntry);
+                updateNetworkLog();
+            }
+
+            return originalFetch.apply(this, args)
+                .then(response => {
+                    if (url.includes('manifest.json')) {
+                        // Clone response to read it
+                        return response.clone().json().then(data => {
+                            updateWidgetInfo(data);
+                            return response;
+                        });
+                    }
+                    return response;
+                });
+        };
+
+        function updateNetworkLog() {
+            const logEl = document.getElementById('network-log');
+            const entries = networkLog.slice(-20).reverse(); // Show last 20 entries
+
+            const html = entries.map(entry => {
+                const urlParts = entry.url.split('?');
+                const params = urlParts[1] || '';
+                return `<div class="log-entry">
+                    <span class="log-time">${entry.time}</span>
+                    <span class="log-url">${urlParts[0].split('/').pop()}</span>
+                    ${params ? `<span style="color: #94a3b8"> ? ${params}</span>` : ''}
+                </div>`;
+            }).join('');
+
+            logEl.innerHTML = `<div style="color: #60a5fa; font-weight: bold; margin-bottom: 10px;">📡 Network Activity Log:</div>` + html;
+        }
+
+        function updateWidgetInfo(manifest) {
+            document.getElementById('version').textContent = manifest.version;
+            document.getElementById('build-time').textContent = new Date(manifest.buildTime).toLocaleString();
+            document.getElementById('status').className = 'status-badge status-loaded';
+            document.getElementById('status').textContent = 'Loaded';
+
+            // Get manifest URL
+            const scriptTag = document.querySelector('script[src*="loader"]');
+            if (scriptTag) {
+                const baseUrl = scriptTag.src.replace(/[^\/]*$/, '');
+                document.getElementById('manifest-url').textContent = baseUrl + 'manifest.json';
+            }
+        }
+
+        function reloadWidget() {
+            // Clear the widget
+            const widgets = document.querySelectorAll('mapsy-widget');
+            widgets.forEach(w => {
+                w.innerHTML = '';
+                delete w.dataset.mapsyInitialized;
+            });
+
+            // Clear logs
+            networkLog.length = 0;
+            updateNetworkLog();
+
+            // Reset status
+            document.getElementById('status').className = 'status-badge status-loading';
+            document.getElementById('status').textContent = 'Reloading...';
+
+            // Reload the loader script with new timestamp
+            const oldScript = document.querySelector('script[src*="loader"]');
+            if (oldScript) {
+                const newScript = document.createElement('script');
+                newScript.src = oldScript.src.split('?')[0] + '?reload=' + Date.now();
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            }
+        }
+
+        function clearLogs() {
+            networkLog.length = 0;
+            updateNetworkLog();
+        }
+
+        function showManifest() {
+            if (window.MapsyWidget && window.MapsyWidget._manifest) {
+                alert(JSON.stringify(window.MapsyWidget._manifest, null, 2));
+            } else {
+                alert('Manifest not loaded yet');
+            }
+        }
+
+        // Check widget version after load
+        setTimeout(() => {
+            if (window.MapsyWidget) {
+                console.log('Widget Version:', window.MapsyWidget.version);
+                console.log('Widget Manifest:', window.MapsyWidget._manifest);
+            }
+        }, 1000);
+    </script>
+
+    <!-- Load the widget loader (this is the only script needed) -->
+    <script src="dist/mapsy-widget-loader.js"></script>
+</body>
+</html>

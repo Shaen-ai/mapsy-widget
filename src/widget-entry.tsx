@@ -9,33 +9,14 @@ declare global {
       init: (selector?: string, config?: any) => void;
       version: string;
       autoInit: () => void;
+      _version?: string;
+      _manifest?: any;
     };
   }
 }
 
 class MapsyWidget {
-  private static version: string = '0.0.0';
-  private static manifestUrl: string = '';
   private static initialized: boolean = false;
-
-  static async fetchVersion() {
-    try {
-      const currentScript = document.currentScript as HTMLScriptElement;
-      if (currentScript) {
-        const scriptUrl = new URL(currentScript.src);
-        const manifestUrl = new URL('manifest.json', scriptUrl.origin + scriptUrl.pathname.replace(/[^\/]*$/, ''));
-
-        const response = await fetch(manifestUrl.href);
-        if (response.ok) {
-          const manifest = await response.json();
-          this.version = manifest.version || '0.0.0';
-          console.log(`Mapsy Widget Version: ${this.version}`);
-        }
-      }
-    } catch (error) {
-      console.warn('Could not fetch widget manifest:', error);
-    }
-  }
 
   static init(selector?: string, config?: any) {
     // If no selector provided, look for mapsy-widget tags
@@ -123,12 +104,15 @@ class MapsyWidget {
   }
 
   static getVersion() {
-    return this.version;
+    // Return version from loader
+    return (window.MapsyWidget && window.MapsyWidget._version) || '0.0.0';
+  }
+
+  static getManifest() {
+    // Return manifest from loader
+    return (window.MapsyWidget && window.MapsyWidget._manifest) || {};
   }
 }
-
-// Auto-fetch version on load
-MapsyWidget.fetchVersion();
 
 // Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
@@ -146,7 +130,9 @@ window.MapsyWidget = {
   autoInit: MapsyWidget.autoInit.bind(MapsyWidget),
   get version() {
     return MapsyWidget.getVersion();
-  }
+  },
+  _version: window.MapsyWidget?._version,
+  _manifest: window.MapsyWidget?._manifest
 };
 
 export default MapsyWidget;
