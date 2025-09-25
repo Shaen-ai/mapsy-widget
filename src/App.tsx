@@ -27,7 +27,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   const [currentView, setCurrentView] = useState<'map' | 'list'>('map');
   const [config, setConfig] = useState<WidgetConfig>({
     defaultView: 'map',
-    showHeader: true,
+    showHeader: false, // Hide header by default
     headerTitle: 'Our Locations',
     mapZoomLevel: 12,
     primaryColor: '#3B82F6',
