@@ -18,20 +18,55 @@ declare global {
 class MapsyWidget {
   private static initialized: boolean = false;
 
-  static init(selector?: string, config?: any) {
-    // If no selector provided, look for mapsy-widget tags
-    if (!selector) {
+  static init(selectorOrConfig?: string | HTMLElement | any, config?: any) {
+    // Handle different parameter types
+    if (!selectorOrConfig) {
+      // No parameters - auto init
       this.autoInit();
       return;
     }
 
-    const element = document.querySelector(selector);
-    if (!element) {
-      console.error(`Element with selector "${selector}" not found`);
+    // Check if first parameter is a config object (has container property)
+    if (typeof selectorOrConfig === 'object' && !(selectorOrConfig instanceof HTMLElement)) {
+      // It's a config object
+      const configObj = selectorOrConfig;
+      if (configObj.container) {
+        // Container can be either an element or a selector
+        const element = configObj.container instanceof HTMLElement
+          ? configObj.container
+          : document.querySelector(configObj.container);
+
+        if (element) {
+          this.renderWidget(element as HTMLElement, configObj);
+        } else {
+          console.error(`Element not found:`, configObj.container);
+        }
+      } else {
+        // No container specified, auto-init
+        this.autoInit();
+      }
       return;
     }
 
-    this.renderWidget(element as HTMLElement, config);
+    // Handle as selector string or HTMLElement
+    let element: HTMLElement | null = null;
+
+    if (typeof selectorOrConfig === 'string') {
+      // It's a selector string
+      element = document.querySelector(selectorOrConfig);
+      if (!element) {
+        console.error(`Element with selector "${selectorOrConfig}" not found`);
+        return;
+      }
+    } else if (selectorOrConfig instanceof HTMLElement) {
+      // It's already an element
+      element = selectorOrConfig;
+    } else {
+      console.error('Invalid first parameter. Expected selector string, HTMLElement, or config object');
+      return;
+    }
+
+    this.renderWidget(element, config);
   }
 
   static autoInit() {
