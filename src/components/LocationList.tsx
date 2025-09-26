@@ -12,6 +12,7 @@ const LocationList: React.FC<LocationListProps> = ({
   locations,
   selectedLocation,
   onLocationSelect,
+  primaryColor = '#3B82F6',
 }) => {
   const getCurrentDayHours = (location: Location) => {
     const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -86,7 +87,8 @@ const LocationList: React.FC<LocationListProps> = ({
                     <FiPhone className="flex-shrink-0" size={14} />
                     <a
                       href={`tel:${location.phone}`}
-                      className="text-blue-600 hover:underline"
+                      className="hover:underline"
+                      style={{ color: primaryColor }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {location.phone}
@@ -124,16 +126,19 @@ const LocationList: React.FC<LocationListProps> = ({
                     <FiGlobe size={16} />
                   </a>
                 )}
+              </div>
 
+              <div className="mt-3">
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location.address)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                  title="Get Directions"
+                  className="flex items-center justify-center gap-2 w-full px-3 py-2 text-white text-sm rounded-lg hover:opacity-90 transition"
+                  style={{ backgroundColor: primaryColor }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <FiNavigation size={16} />
+                  Get Directions
                 </a>
               </div>
             </div>
