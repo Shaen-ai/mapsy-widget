@@ -43,6 +43,22 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     fetchConfig();
     fetchLocations();
 
+    // Register a global listener for config updates
+    const configUpdateListener = (updatedConfig: WidgetConfig) => {
+      console.log('[Widget] Config update received via global listener:', updatedConfig);
+      setConfig(prev => ({ ...prev, ...updatedConfig }));
+      setCurrentView(updatedConfig.defaultView || currentView);
+    };
+
+    // Initialize the global listeners array if it doesn't exist
+    if (!(window as any).__mapsyConfigListeners) {
+      (window as any).__mapsyConfigListeners = [];
+    }
+
+    // Add our listener to the global array
+    (window as any).__mapsyConfigListeners.push(configUpdateListener);
+    console.log('[Widget] Registered global config listener. Total listeners:', (window as any).__mapsyConfigListeners.length);
+
     // Listen for configuration updates from settings panel
     const handleStorageChange = (e: StorageEvent) => {
       console.log('[Widget] Storage event received:', e.key, e.newValue);
@@ -131,6 +147,15 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     }
 
     return () => {
+      // Remove the global listener
+      if ((window as any).__mapsyConfigListeners) {
+        const index = (window as any).__mapsyConfigListeners.indexOf(configUpdateListener);
+        if (index > -1) {
+          (window as any).__mapsyConfigListeners.splice(index, 1);
+          console.log('[Widget] Removed global config listener. Remaining listeners:', (window as any).__mapsyConfigListeners.length);
+        }
+      }
+
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
       document.removeEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
