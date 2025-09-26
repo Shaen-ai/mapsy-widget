@@ -179,18 +179,9 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   private setupWixListeners() {
-    // Listen for Wix-specific messages
-    window.addEventListener('message', (event) => {
-      if (event.data?.type === 'wix-widget-update') {
-        const { property, value } = event.data;
-
-        // Convert camelCase to kebab-case for attributes
-        const attrName = property.replace(/([A-Z])/g, '-$1').toLowerCase();
-
-        // Update attribute (which will trigger attributeChangedCallback)
-        this.setAttribute(attrName, String(value));
-      }
-    });
+    // In Wix environment, updates come through setProp which updates attributes directly
+    // No need for message listeners
+    console.log('[MapsyWidgetElement] Ready to receive Wix updates via setProp');
   }
 
   // Public method for Wix to update properties

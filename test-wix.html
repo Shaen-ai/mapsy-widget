@@ -87,36 +87,6 @@
 
       // Make widget accessible globally for testing
       window.mapsyWidget = widget;
-
-      // Listen for postMessage from settings
-      window.addEventListener('message', (event) => {
-        console.log('[Test Page] Message received:', event.data);
-
-        if (event.data && event.data.type === 'mapsy-config-update') {
-          const config = event.data.config;
-          console.log('[Test Page] Updating widget attributes from settings:', config);
-
-          // Update widget attributes (simulating Wix setProp behavior)
-          if (config.defaultView !== undefined) {
-            widget.setAttribute('defaultview', config.defaultView);
-          }
-          if (config.showHeader !== undefined) {
-            widget.setAttribute('showheader', String(config.showHeader));
-          }
-          if (config.headerTitle !== undefined) {
-            widget.setAttribute('headertitle', config.headerTitle);
-          }
-          if (config.mapZoomLevel !== undefined) {
-            widget.setAttribute('mapzoomlevel', String(config.mapZoomLevel));
-          }
-          if (config.primaryColor !== undefined) {
-            widget.setAttribute('primarycolor', config.primaryColor);
-          }
-
-          // Also set full config
-          widget.setAttribute('config', JSON.stringify(config));
-        }
-      });
     });
 
     // Simulate Wix SDK for testing
