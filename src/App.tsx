@@ -86,9 +86,10 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
     // Listen for postMessage events
     const handlePostMessage = (e: MessageEvent) => {
-      console.log('[Widget] PostMessage received:', e.data);
+      console.log('[Widget] PostMessage received from:', e.origin, 'Data:', e.data);
       if (e.data && e.data.type === 'mapsy-config-update' && e.data.config) {
         console.log('[Widget] Config update via postMessage:', e.data.config);
+        console.log('[Widget] Source:', e.data.source);
         setConfig(prev => ({ ...prev, ...e.data.config }));
         setCurrentView(e.data.config.defaultView || currentView);
       }

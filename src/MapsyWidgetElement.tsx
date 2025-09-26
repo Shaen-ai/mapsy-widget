@@ -26,11 +26,17 @@ class MapsyWidgetElement extends HTMLElement {
   static get observedAttributes() {
     return [
       'default-view',
+      'defaultview',  // Support both hyphenated and non-hyphenated
       'show-header',
+      'showheader',
       'header-title',
+      'headertitle',
       'map-zoom-level',
+      'mapzoomlevel',
       'primary-color',
-      'api-url'
+      'primarycolor',
+      'api-url',
+      'config'  // Support full config as JSON string
     ];
   }
 
@@ -59,34 +65,50 @@ class MapsyWidgetElement extends HTMLElement {
 
   // Called when observed attributes change
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    console.log(`Attribute ${name} changed from ${oldValue} to ${newValue}`);
+    console.log(`[MapsyWidgetElement] Attribute ${name} changed from ${oldValue} to ${newValue}`);
 
-    if (oldValue === newValue) return;
+    if (oldValue === newValue || newValue === null) return;
 
     // Update config based on attribute changes
     switch (name) {
       case 'default-view':
+      case 'defaultview':
         this.config.defaultView = (newValue === 'list' ? 'list' : 'map');
         break;
       case 'show-header':
+      case 'showheader':
         this.config.showHeader = newValue === 'true';
         break;
       case 'header-title':
+      case 'headertitle':
         this.config.headerTitle = newValue || 'Our Locations';
         break;
       case 'map-zoom-level':
+      case 'mapzoomlevel':
         this.config.mapZoomLevel = parseInt(newValue || '12', 10);
         break;
       case 'primary-color':
+      case 'primarycolor':
         this.config.primaryColor = newValue || '#3B82F6';
         break;
       case 'api-url':
         this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
         break;
+      case 'config':
+        // Handle full config as JSON
+        try {
+          const parsedConfig = JSON.parse(newValue);
+          this.config = { ...this.config, ...parsedConfig };
+          console.log('[MapsyWidgetElement] Config updated from JSON:', this.config);
+        } catch (error) {
+          console.error('[MapsyWidgetElement] Error parsing config JSON:', error);
+        }
+        break;
     }
 
     // Re-render React app with new config
     if (this.root) {
+      console.log('[MapsyWidgetElement] Re-rendering with updated config');
       this.mountReactApp();
     }
   }
