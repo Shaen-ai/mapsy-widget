@@ -68,13 +68,51 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
       }
     };
 
+    // Listen for postMessage events
+    const handlePostMessage = (e: MessageEvent) => {
+      console.log('[Widget] PostMessage received:', e.data);
+      if (e.data && e.data.type === 'mapsy-config-update' && e.data.config) {
+        console.log('[Widget] Config update via postMessage:', e.data.config);
+        setConfig(prev => ({ ...prev, ...e.data.config }));
+        setCurrentView(e.data.config.defaultView || currentView);
+      }
+    };
+
+    // Listen for BroadcastChannel messages
+    const bc = new BroadcastChannel('mapsy-widget-config');
+    bc.onmessage = (e) => {
+      console.log('[Widget] BroadcastChannel message received:', e.data);
+      if (e.data) {
+        setConfig(prev => ({ ...prev, ...e.data }));
+        setCurrentView(e.data.defaultView || currentView);
+      }
+    };
+    console.log('[Widget] BroadcastChannel listener added');
+
     // Listen for storage events (cross-tab/iframe communication)
     window.addEventListener('storage', handleStorageChange);
     console.log('[Widget] Added storage event listener');
 
-    // Listen for custom events (same-window communication)
+    // Listen for custom events on both window and document
     window.addEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
-    console.log('[Widget] Added custom event listener for mapsy-config-update');
+    console.log('[Widget] Added custom event listener on window');
+
+    document.addEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
+    console.log('[Widget] Added custom event listener on document');
+
+    // Listen for postMessage
+    window.addEventListener('message', handlePostMessage);
+    console.log('[Widget] Added postMessage listener');
+
+    // Expose updateConfig method on MapsyWidget for direct calls
+    if ((window as any).MapsyWidget) {
+      (window as any).MapsyWidget.updateConfig = (newConfig: WidgetConfig) => {
+        console.log('[Widget] updateConfig called directly:', newConfig);
+        setConfig(prev => ({ ...prev, ...newConfig }));
+        setCurrentView(newConfig.defaultView || currentView);
+      };
+      console.log('[Widget] Exposed MapsyWidget.updateConfig method');
+    }
 
     // Check for existing config in localStorage on mount
     const storedConfig = localStorage.getItem('mapsy-widget-config');
@@ -95,6 +133,10 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
+      document.removeEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
+      window.removeEventListener('message', handlePostMessage);
+      bc.close();
+      console.log('[Widget] Cleaned up all event listeners');
     };
   }, [apiUrl]);
 
