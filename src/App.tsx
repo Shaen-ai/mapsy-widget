@@ -42,6 +42,60 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
     fetchConfig();
     fetchLocations();
+
+    // Listen for configuration updates from settings panel
+    const handleStorageChange = (e: StorageEvent) => {
+      console.log('[Widget] Storage event received:', e.key, e.newValue);
+      if (e.key === 'mapsy-widget-config' && e.newValue) {
+        try {
+          const updatedConfig = JSON.parse(e.newValue);
+          console.log('[Widget] Parsed config from storage:', updatedConfig);
+          setConfig(prev => ({ ...prev, ...updatedConfig }));
+          setCurrentView(updatedConfig.defaultView || currentView);
+          console.log('[Widget] Config updated via storage event');
+        } catch (error) {
+          console.error('[Widget] Error parsing config update:', error);
+        }
+      }
+    };
+
+    const handleCustomConfigUpdate = (e: CustomEvent) => {
+      console.log('[Widget] Custom event received:', e.detail);
+      if (e.detail) {
+        setConfig(prev => ({ ...prev, ...e.detail }));
+        setCurrentView(e.detail.defaultView || currentView);
+        console.log('[Widget] Config updated via custom event');
+      }
+    };
+
+    // Listen for storage events (cross-tab/iframe communication)
+    window.addEventListener('storage', handleStorageChange);
+    console.log('[Widget] Added storage event listener');
+
+    // Listen for custom events (same-window communication)
+    window.addEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
+    console.log('[Widget] Added custom event listener for mapsy-config-update');
+
+    // Check for existing config in localStorage on mount
+    const storedConfig = localStorage.getItem('mapsy-widget-config');
+    console.log('[Widget] Checking localStorage on mount:', storedConfig);
+    if (storedConfig) {
+      try {
+        const parsedConfig = JSON.parse(storedConfig);
+        console.log('[Widget] Found config in localStorage:', parsedConfig);
+        setConfig(prev => ({ ...prev, ...parsedConfig }));
+        setCurrentView(parsedConfig.defaultView || config.defaultView);
+      } catch (error) {
+        console.error('[Widget] Error parsing stored config:', error);
+      }
+    } else {
+      console.log('[Widget] No config found in localStorage');
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('mapsy-config-update', handleCustomConfigUpdate as EventListener);
+    };
   }, [apiUrl]);
 
   const fetchConfig = async () => {
