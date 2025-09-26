@@ -18,7 +18,7 @@ const MapView: React.FC<MapViewProps> = ({
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<any[]>([]); // Using any for now as AdvancedMarkerElement types might not be available
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
   useEffect(() => {
@@ -28,17 +28,19 @@ const MapView: React.FC<MapViewProps> = ({
     const loader = new Loader({
       apiKey: GOOGLE_MAPS_API_KEY,
       version: 'weekly',
+      libraries: ['marker'], // Add marker library for AdvancedMarkerElement
     });
 
     loader.load().then(() => {
       if (mapRef.current && !mapInstance.current) {
-        // Initialize map
+        // Initialize map with mapId for AdvancedMarkerElement support
         mapInstance.current = new google.maps.Map(mapRef.current, {
           center: { lat: 40.7128, lng: -74.0060 },
           zoom: 12,
           mapTypeControl: false,
           fullscreenControl: true,
           streetViewControl: true,
+          mapId: 'MAPSY_WIDGET_MAP', // Required for AdvancedMarkerElement
         });
 
         // Initialize info window
@@ -50,38 +52,68 @@ const MapView: React.FC<MapViewProps> = ({
       }
 
       // Clear existing markers
-      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current.forEach(marker => {
+        if (marker.map) {
+          marker.map = null; // Remove AdvancedMarkerElement from map
+        }
+      });
       markersRef.current = [];
 
       // Add markers for locations
       if (mapInstance.current && locations.length > 0) {
         const bounds = new google.maps.LatLngBounds();
-        const newMarkers: google.maps.Marker[] = [];
+        const newMarkers: any[] = [];
 
         locations.forEach((location) => {
           if (location.latitude && location.longitude) {
             const position = { lat: location.latitude, lng: location.longitude };
 
-            const marker = new google.maps.Marker({
-              position,
-              map: mapInstance.current!,
-              title: location.name,
-              animation: google.maps.Animation.DROP,
-            });
+            // Check if AdvancedMarkerElement is available
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+              // Use AdvancedMarkerElement (new way)
+              const marker = new google.maps.marker.AdvancedMarkerElement({
+                position,
+                map: mapInstance.current!,
+                title: location.name,
+              });
 
-            // Add click listener to marker
-            marker.addListener('click', () => {
-              if (infoWindowRef.current && mapInstance.current) {
-                const content = createInfoWindowContent(location);
-                infoWindowRef.current.setContent(content);
-                infoWindowRef.current.open(mapInstance.current, marker);
-              }
-              if (onMarkerClick) {
-                onMarkerClick(location);
-              }
-            });
+              // Add click listener to marker
+              marker.addListener('click', () => {
+                if (infoWindowRef.current && mapInstance.current) {
+                  const content = createInfoWindowContent(location);
+                  infoWindowRef.current.setContent(content);
+                  infoWindowRef.current.open(mapInstance.current, marker as any);
+                }
+                if (onMarkerClick) {
+                  onMarkerClick(location);
+                }
+              });
 
-            newMarkers.push(marker);
+              newMarkers.push(marker);
+            } else {
+              // Fallback to regular Marker if AdvancedMarkerElement is not available
+              const marker = new google.maps.Marker({
+                position,
+                map: mapInstance.current!,
+                title: location.name,
+                animation: google.maps.Animation.DROP,
+              });
+
+              // Add click listener to marker
+              marker.addListener('click', () => {
+                if (infoWindowRef.current && mapInstance.current) {
+                  const content = createInfoWindowContent(location);
+                  infoWindowRef.current.setContent(content);
+                  infoWindowRef.current.open(mapInstance.current, marker);
+                }
+                if (onMarkerClick) {
+                  onMarkerClick(location);
+                }
+              });
+
+              newMarkers.push(marker);
+            }
+
             bounds.extend(position);
           }
         });
@@ -109,7 +141,13 @@ const MapView: React.FC<MapViewProps> = ({
 
     return () => {
       // Cleanup markers on unmount
-      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current.forEach(marker => {
+        if (marker.map) {
+          marker.map = null; // For AdvancedMarkerElement
+        } else if (marker.setMap) {
+          marker.setMap(null); // For regular Marker
+        }
+      });
     };
   }, [locations, onMapLoad, onMarkersLoad, onMarkerClick]);
 
