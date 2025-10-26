@@ -15,54 +15,49 @@ export const initializeApi = (apiUrl?: string) => {
 // Initialize with production URL
 initializeApi();
 
-// Helper function to make authenticated requests using Wix SDK
+// Helper function to make authenticated requests
 async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<Response> {
   const url = `${apiBaseUrl}${endpoint}`;
 
   console.log('[API] Preparing request to:', endpoint);
   console.log('[API] Full URL:', url);
 
-  const wixClient = wixService.getWixClient();
+  const instanceToken = wixService.getInstanceToken();
   const compId = wixService.getCompId();
 
-  // If we have a Wix client, use fetchWithAuth (official Wix method)
-  if (wixClient && wixClient.fetchWithAuth) {
-    console.log('[API] Using Wix fetchWithAuth (authenticated)');
-    console.log('[API] Comp ID:', compId || 'Not set');
+  console.log('[API] Instance token available:', instanceToken ? 'YES' : 'NO');
+  console.log('[API] Comp ID available:', compId || 'NO');
 
-    try {
-      // Add compId as custom header if available
-      const headers = new Headers(options?.headers);
-      if (compId) {
-        headers.set('X-Wix-Comp-Id', compId);
-        console.log('[API] ✅ Added Comp ID header:', compId);
-      }
+  // Build headers
+  const headers = new Headers(options?.headers);
+  headers.set('Content-Type', 'application/json');
 
-      const response = await wixClient.fetchWithAuth(url, {
-        ...options,
-        headers,
-      });
-
-      console.log('[API] ✅ Request completed with status:', response.status);
-      return response;
-    } catch (error) {
-      console.error('[API] Error in fetchWithAuth:', error);
-      throw error;
-    }
+  // Add instance token if available
+  if (instanceToken) {
+    headers.set('Authorization', `Bearer ${instanceToken}`);
+    console.log('[API] ✅ Added Authorization header with instance token');
+    console.log('[API] Token preview:', instanceToken.substring(0, 20) + '...');
   } else {
-    // Fallback to regular fetch for development/standalone mode
-    console.log('[API] ⚠️ Wix client not available, using regular fetch (unauthenticated)');
+    console.warn('[API] ⚠️ No instance token - request will be unauthenticated');
+  }
 
-    const headers = new Headers(options?.headers);
-    headers.set('Content-Type', 'application/json');
+  // Add compId if available
+  if (compId) {
+    headers.set('X-Wix-Comp-Id', compId);
+    console.log('[API] ✅ Added X-Wix-Comp-Id header:', compId);
+  }
 
+  try {
     const response = await fetch(url, {
       ...options,
       headers,
     });
 
-    console.log('[API] Request completed with status:', response.status);
+    console.log('[API] ✅ Request completed with status:', response.status);
     return response;
+  } catch (error) {
+    console.error('[API] ❌ Request failed:', error);
+    throw error;
   }
 }
 
