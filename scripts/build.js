@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { minify } from 'terser';
+import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -34,6 +35,17 @@ async function incrementVersion() {
   await fs.writeFile(packagePath, JSON.stringify(packageJson, null, 2));
 
   console.log(`✅ Version bumped to ${newVersion}`);
+
+  // Commit the version changes to git
+  try {
+    execSync('git add src/manifest.json package.json', { stdio: 'pipe' });
+    execSync(`git commit -m "Bump widget version to ${newVersion}"`, { stdio: 'pipe' });
+    console.log(`✅ Version changes committed to git`);
+  } catch (error) {
+    // If commit fails (e.g., no changes or not a git repo), that's okay
+    console.log(`⚠️  Could not commit version changes (this is okay if no changes)`);
+  }
+
   return newVersion;
 }
 
