@@ -9,6 +9,7 @@ import wixService from './services/wixService';
  */
 class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
+  private _initialized: boolean = false;
   private config = {
     defaultView: 'map' as 'map' | 'list',
     showHeader: false,
@@ -20,6 +21,7 @@ class MapsyWidgetElement extends HTMLElement {
 
   constructor() {
     super();
+    console.log('[MapsyWidgetElement] Constructor called');
     this.attachShadow({ mode: 'open' });
   }
 
@@ -45,12 +47,20 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   async connectedCallback() {
-    console.log('MapsyWidget connected to DOM');
-    console.log('[MapsyWidget] All attributes:', this.getAttributeNames());
+    // Prevent double initialization
+    if (this._initialized) {
+      console.log('[MapsyWidget] Already initialized, skipping connectedCallback');
+      return;
+    }
 
-    // Try to get compId from various attribute formats
-    const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id');
-    console.log('[MapsyWidget] CompId from attributes:', compId);
+    try {
+      console.log('[MapsyWidget] === connectedCallback START ===');
+      console.log('[MapsyWidget] Connected to DOM');
+      console.log('[MapsyWidget] All attributes:', this.getAttributeNames());
+
+      // Try to get compId from various attribute formats
+      const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id');
+      console.log('[MapsyWidget] CompId from attributes:', compId);
 
     // Try to get instance token from multiple sources
     let instanceToken = this.getAttribute('instance') || this.getAttribute('instance-token');
@@ -94,30 +104,46 @@ class MapsyWidgetElement extends HTMLElement {
       console.log('[MapsyWidget] No instance token found in attributes, URL, or globals - will try SDK');
     }
 
-    // Listen for instance token from parent window via postMessage
-    this.setupPostMessageListener();
+      // Listen for instance token from parent window via postMessage
+      this.setupPostMessageListener();
 
-    // Initialize Wix service with explicit token and compId
-    console.log('[MapsyWidget] Initializing Wix client...');
-    await wixService.initialize(compId || undefined, instanceToken || undefined);
+      // Initialize Wix service with explicit token and compId
+      console.log('[MapsyWidget] Initializing Wix client...');
+      await wixService.initialize(compId || undefined, instanceToken || undefined);
 
-    // Log the result
-    if (wixService.isInitialized()) {
-      console.log('[MapsyWidget] ✅ Wix client initialized successfully');
-      console.log('[MapsyWidget] Instance token:', wixService.getInstanceToken() ? 'Available' : 'Not available');
-      console.log('[MapsyWidget] Comp ID:', wixService.getCompId() || 'Not set');
-    } else {
-      console.log('[MapsyWidget] ⚠️ Running in standalone mode (no Wix)');
+      // Log the result
+      if (wixService.isInitialized()) {
+        console.log('[MapsyWidget] ✅ Wix client initialized successfully');
+        console.log('[MapsyWidget] Instance token:', wixService.getInstanceToken() ? 'Available' : 'Not available');
+        console.log('[MapsyWidget] Comp ID:', wixService.getCompId() || 'Not set');
+      } else {
+        console.log('[MapsyWidget] ⚠️ Running in standalone mode (no Wix)');
+      }
+
+      // Read initial attributes
+      this.updateConfigFromAttributes();
+
+      // Mount React app
+      this.mountReactApp();
+
+      // Listen for Wix settings updates
+      this.setupWixListeners();
+
+      // Mark as initialized
+      this._initialized = true;
+      console.log('[MapsyWidget] === connectedCallback COMPLETE ===');
+
+    } catch (error) {
+      console.error('[MapsyWidget] ERROR in connectedCallback:', error);
+      console.error('[MapsyWidget] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      // Still try to mount the app even if there's an error
+      try {
+        this.mountReactApp();
+        this._initialized = true;
+      } catch (mountError) {
+        console.error('[MapsyWidget] Failed to mount React app:', mountError);
+      }
     }
-
-    // Read initial attributes
-    this.updateConfigFromAttributes();
-
-    // Mount React app
-    this.mountReactApp();
-
-    // Listen for Wix settings updates
-    this.setupWixListeners();
   }
 
   disconnectedCallback() {
@@ -346,6 +372,27 @@ class MapsyWidgetElement extends HTMLElement {
 // Register the custom element
 if (!customElements.get('mapsy-widget')) {
   customElements.define('mapsy-widget', MapsyWidgetElement);
+  console.log('[MapsyWidgetElement] Custom element registered');
+
+  // Manually trigger connectedCallback for any elements that already exist in DOM
+  // (they were added before the custom element was defined)
+  setTimeout(() => {
+    const existingWidgets = document.querySelectorAll('mapsy-widget');
+    console.log(`[MapsyWidgetElement] Found ${existingWidgets.length} existing widget elements to initialize`);
+
+    existingWidgets.forEach((widget) => {
+      // Force re-initialization by calling connectedCallback if element is already connected
+      if (widget.isConnected && widget instanceof MapsyWidgetElement) {
+        console.log('[MapsyWidgetElement] Manually initializing existing widget');
+        // The element should already be initialized via upgrade, but let's ensure it
+        if (!(widget as any)._initialized) {
+          (widget as MapsyWidgetElement).connectedCallback();
+        }
+      }
+    });
+  }, 0);
+} else {
+  console.log('[MapsyWidgetElement] Custom element already registered');
 }
 
 export default MapsyWidgetElement;
