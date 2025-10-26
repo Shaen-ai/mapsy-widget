@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import wixService from './services/wixService';
 
 /**
  * Custom Element for Wix integration
@@ -40,8 +41,17 @@ class MapsyWidgetElement extends HTMLElement {
     ];
   }
 
-  connectedCallback() {
+  async connectedCallback() {
     console.log('MapsyWidget connected to DOM');
+
+    // Initialize Wix client if in Wix environment
+    const compId = this.getAttribute('compId');
+    if (compId) {
+      console.log('[MapsyWidget] Detected Wix environment, initializing Wix client...');
+      await wixService.initialize(compId);
+    } else {
+      console.log('[MapsyWidget] No compId found, running in standalone mode');
+    }
 
     // Read initial attributes
     this.updateConfigFromAttributes();

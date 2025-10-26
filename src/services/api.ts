@@ -1,5 +1,6 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { Location } from '../types/location';
+import wixService from './wixService';
 
 let apiInstance: AxiosInstance;
 
@@ -16,6 +17,30 @@ export const initializeApi = (apiUrl?: string) => {
       'Content-Type': 'application/json',
     },
   });
+
+  // Add request interceptor to include Wix instance token
+  apiInstance.interceptors.request.use(
+    (config: InternalAxiosRequestConfig) => {
+      const instanceToken = wixService.getInstanceToken();
+      const compId = wixService.getCompId();
+
+      if (instanceToken) {
+        // Add Authorization header with Bearer token
+        config.headers.Authorization = `Bearer ${instanceToken}`;
+        console.log('[API] Added Wix instance token to request');
+      }
+
+      if (compId) {
+        // Add compId as a custom header
+        config.headers['X-Wix-Comp-Id'] = compId;
+      }
+
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
 };
 
 // Initialize with production URL
