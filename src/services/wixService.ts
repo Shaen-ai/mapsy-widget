@@ -64,6 +64,8 @@ class WixService {
               try {
                 const authHeaders = await this.wixClient.auth.getAuthHeaders();
                 console.log('[WixService] Auth headers:', authHeaders);
+                console.log('[WixService] Headers object:', authHeaders?.headers);
+                console.log('[WixService] Headers keys:', authHeaders?.headers ? Object.keys(authHeaders.headers) : 'no headers');
 
                 // Check if headers contain Authorization
                 if (authHeaders && authHeaders.headers && authHeaders.headers.Authorization) {
