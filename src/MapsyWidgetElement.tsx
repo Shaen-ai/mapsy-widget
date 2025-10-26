@@ -9,7 +9,7 @@ import wixService from './services/wixService';
  */
 class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
-  private _initialized: boolean = false;
+  public _initialized: boolean = false; // Public so we can check from outside
   private config = {
     defaultView: 'map' as 'map' | 'list',
     showHeader: false,
@@ -249,26 +249,41 @@ class MapsyWidgetElement extends HTMLElement {
 
 // Register the custom element
 if (!customElements.get('mapsy-widget')) {
+  console.log('[MapsyWidgetElement] Registering custom element...');
   customElements.define('mapsy-widget', MapsyWidgetElement);
-  console.log('[MapsyWidgetElement] Custom element registered');
+  console.log('[MapsyWidgetElement] ✅ Custom element registered');
 
-  // Manually trigger connectedCallback for any elements that already exist in DOM
-  // (they were added before the custom element was defined)
+  // IMPORTANT: Manually upgrade any existing elements
+  // When custom element is defined AFTER elements already exist in DOM,
+  // browser automatically upgrades them, but we need to ensure connectedCallback runs
   setTimeout(() => {
     const existingWidgets = document.querySelectorAll('mapsy-widget');
-    console.log(`[MapsyWidgetElement] Found ${existingWidgets.length} existing widget elements to initialize`);
+    console.log(`[MapsyWidgetElement] Found ${existingWidgets.length} existing widget elements`);
 
-    existingWidgets.forEach((widget) => {
-      // Force re-initialization by calling connectedCallback if element is already connected
-      if (widget.isConnected && widget instanceof MapsyWidgetElement) {
-        console.log('[MapsyWidgetElement] Manually initializing existing widget');
-        // The element should already be initialized via upgrade, but let's ensure it
-        if (!(widget as any)._initialized) {
-          (widget as MapsyWidgetElement).connectedCallback();
+    existingWidgets.forEach((widget, index) => {
+      console.log(`[MapsyWidgetElement] Checking widget ${index + 1}:`, {
+        isConnected: widget.isConnected,
+        isInstance: widget instanceof MapsyWidgetElement,
+        hasRoot: !!(widget as any).root,
+        isInitialized: !!(widget as any)._initialized,
+      });
+
+      // If element is upgraded but not initialized, manually call connectedCallback
+      if (widget instanceof MapsyWidgetElement) {
+        const widgetElement = widget as MapsyWidgetElement;
+        if (!widgetElement._initialized) {
+          console.log('[MapsyWidgetElement] Manually initializing widget', index + 1);
+          widgetElement.connectedCallback().catch(err => {
+            console.error('[MapsyWidgetElement] Error during manual initialization:', err);
+          });
+        } else {
+          console.log('[MapsyWidgetElement] Widget', index + 1, 'already initialized');
         }
+      } else {
+        console.warn('[MapsyWidgetElement] Widget', index + 1, 'not upgraded to MapsyWidgetElement instance!');
       }
     });
-  }, 0);
+  }, 100); // Increased timeout to give browser time to upgrade
 } else {
   console.log('[MapsyWidgetElement] Custom element already registered');
 }
