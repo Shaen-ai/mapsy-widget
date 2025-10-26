@@ -18,24 +18,45 @@ class WixService {
   async initialize(compId?: string): Promise<void> {
     try {
       console.log('[WixService] Initializing Wix client...');
+      console.log('[WixService] Environment:', typeof window !== 'undefined' ? 'Browser' : 'Server');
+      console.log('[WixService] User agent:', typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 50) : 'N/A');
 
       // Store compId if provided
       if (compId) {
         this.compId = compId;
-        console.log('[WixService] Component ID:', compId);
+        console.log('[WixService] Component ID stored:', compId);
+      } else {
+        console.log('[WixService] No component ID provided');
       }
 
       // Initialize Wix Client for self-hosted extension
+      console.log('[WixService] Creating Wix client...');
       this.wixClient = createClient({
         auth: { anonymous: true },
       });
+      console.log('[WixService] Wix client created:', this.wixClient ? 'Success' : 'Failed');
 
       // Get encoded instance token (JWT)
-      this.instanceToken = this.wixClient.auth.getInstanceToken();
-      console.log('[WixService] Instance token retrieved');
+      if (this.wixClient && this.wixClient.auth) {
+        console.log('[WixService] Attempting to get instance token...');
+        try {
+          this.instanceToken = this.wixClient.auth.getInstanceToken();
+          if (this.instanceToken) {
+            console.log('[WixService] ✅ Instance token retrieved successfully');
+            console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+          } else {
+            console.warn('[WixService] ⚠️ Instance token is null/undefined');
+          }
+        } catch (tokenError) {
+          console.error('[WixService] Error getting instance token:', tokenError);
+        }
+      } else {
+        console.error('[WixService] Wix client or auth is not available');
+      }
 
     } catch (error) {
       console.error('[WixService] Failed to initialize Wix client:', error);
+      console.error('[WixService] Error details:', error instanceof Error ? error.message : String(error));
       // Don't throw - allow widget to work without Wix in development
     }
   }

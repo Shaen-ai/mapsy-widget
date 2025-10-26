@@ -24,20 +24,31 @@ export const initializeApi = (apiUrl?: string) => {
       const instanceToken = wixService.getInstanceToken();
       const compId = wixService.getCompId();
 
+      console.log('[API Interceptor] Preparing request to:', config.url);
+      console.log('[API Interceptor] Instance token available:', instanceToken ? 'YES' : 'NO');
+      console.log('[API Interceptor] Comp ID available:', compId ? compId : 'NO');
+
       if (instanceToken) {
         // Add Authorization header with Bearer token
         config.headers.Authorization = `Bearer ${instanceToken}`;
-        console.log('[API] Added Wix instance token to request');
+        console.log('[API] ✅ Added Wix instance token to request');
+        console.log('[API] Token preview:', instanceToken.substring(0, 20) + '...');
+      } else {
+        console.warn('[API] ⚠️ No instance token available - request will be sent without authentication');
       }
 
       if (compId) {
         // Add compId as a custom header
         config.headers['X-Wix-Comp-Id'] = compId;
+        console.log('[API] ✅ Added Comp ID header:', compId);
+      } else {
+        console.log('[API] No Comp ID to add');
       }
 
       return config;
     },
     (error) => {
+      console.error('[API Interceptor] Error:', error);
       return Promise.reject(error);
     }
   );

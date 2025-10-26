@@ -37,20 +37,31 @@ class MapsyWidgetElement extends HTMLElement {
       'primary-color',
       'primarycolor',
       'api-url',
+      'compid',  // Wix component ID
       'config'  // Support full config as JSON string
     ];
   }
 
   async connectedCallback() {
     console.log('MapsyWidget connected to DOM');
+    console.log('[MapsyWidget] All attributes:', this.getAttributeNames());
 
-    // Initialize Wix client if in Wix environment
-    const compId = this.getAttribute('compId');
-    if (compId) {
-      console.log('[MapsyWidget] Detected Wix environment, initializing Wix client...');
-      await wixService.initialize(compId);
+    // Try to get compId from various attribute formats
+    const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id');
+
+    console.log('[MapsyWidget] CompId from attributes:', compId);
+
+    // Always try to initialize Wix client (it will work in Wix environment)
+    console.log('[MapsyWidget] Initializing Wix client...');
+    await wixService.initialize(compId || undefined);
+
+    // Log the result
+    if (wixService.isInitialized()) {
+      console.log('[MapsyWidget] ✅ Wix client initialized successfully');
+      console.log('[MapsyWidget] Instance token:', wixService.getInstanceToken() ? 'Available' : 'Not available');
+      console.log('[MapsyWidget] Comp ID:', wixService.getCompId() || 'Not set');
     } else {
-      console.log('[MapsyWidget] No compId found, running in standalone mode');
+      console.log('[MapsyWidget] ⚠️ Running in standalone mode (no Wix)');
     }
 
     // Read initial attributes
