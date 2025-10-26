@@ -29,39 +29,26 @@ class WixService {
         console.log('[WixService] No component ID provided');
       }
 
-      // Use explicit instance token if provided (from attributes or URL)
+      // Use explicit instance token if provided (from attributes, URL, postMessage, or globals)
       if (explicitInstanceToken) {
         this.instanceToken = explicitInstanceToken;
-        console.log('[WixService] ✅ Using explicit instance token from attributes/URL');
+        console.log('[WixService] ✅ Using explicit instance token');
         console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
-      } else {
-        // Fallback to SDK if no explicit token provided
-        console.log('[WixService] No explicit token, trying SDK...');
 
-        // Initialize Wix Client for self-hosted extension
-        console.log('[WixService] Creating Wix client...');
-        this.wixClient = createClient({
-          auth: { anonymous: true },
-        });
-        console.log('[WixService] Wix client created:', this.wixClient ? 'Success' : 'Failed');
-
-        // Get encoded instance token (JWT) from SDK
-        if (this.wixClient && this.wixClient.auth) {
-          console.log('[WixService] Attempting to get instance token from SDK...');
-          try {
-            this.instanceToken = this.wixClient.auth.getInstanceToken();
-            if (this.instanceToken) {
-              console.log('[WixService] ✅ Instance token retrieved from SDK');
-              console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
-            } else {
-              console.warn('[WixService] ⚠️ SDK returned null/undefined instance token');
-            }
-          } catch (tokenError) {
-            console.error('[WixService] Error getting instance token from SDK:', tokenError);
-          }
-        } else {
-          console.error('[WixService] Wix client or auth is not available');
+        // Create a minimal Wix client for compatibility
+        try {
+          this.wixClient = createClient({});
+          console.log('[WixService] Wix client created for compatibility');
+        } catch (error) {
+          console.log('[WixService] Could not create Wix client, will work without it');
         }
+      } else {
+        console.log('[WixService] ⚠️ No instance token provided');
+        console.log('[WixService] For self-hosted widgets, instance token should come from:');
+        console.log('[WixService]   - Element attributes (instance, instance-token)');
+        console.log('[WixService]   - URL parameters (?instance=...)');
+        console.log('[WixService]   - PostMessage from parent window');
+        console.log('[WixService]   - Global variables (window.wixData)');
       }
 
     } catch (error) {
@@ -90,7 +77,8 @@ class WixService {
   }
 
   isInitialized(): boolean {
-    return this.wixClient !== null && this.instanceToken !== null;
+    // For self-hosted widgets, having an instance token is sufficient
+    return this.instanceToken !== null;
   }
 
   getWixClient(): WixClient | null {
