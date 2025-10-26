@@ -38,6 +38,8 @@ class MapsyWidgetElement extends HTMLElement {
       'primarycolor',
       'api-url',
       'compid',  // Wix component ID
+      'instance',  // Wix instance token
+      'instance-token',  // Alternative attribute name
       'config'  // Support full config as JSON string
     ];
   }
@@ -48,12 +50,56 @@ class MapsyWidgetElement extends HTMLElement {
 
     // Try to get compId from various attribute formats
     const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id');
-
     console.log('[MapsyWidget] CompId from attributes:', compId);
 
-    // Always try to initialize Wix client (it will work in Wix environment)
+    // Try to get instance token from multiple sources
+    let instanceToken = this.getAttribute('instance') || this.getAttribute('instance-token');
+
+    // If not in attributes, try URL parameters (current window)
+    if (!instanceToken && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      instanceToken = urlParams.get('instance') || urlParams.get('instanceToken') || null;
+      if (instanceToken) {
+        console.log('[MapsyWidget] Instance token found in current window URL');
+      }
+    }
+
+    // If not in current URL, try parent frame URL (for iframe scenarios)
+    if (!instanceToken && typeof window !== 'undefined' && window.parent !== window) {
+      try {
+        const parentUrl = new URL(window.parent.location.href);
+        const parentParams = new URLSearchParams(parentUrl.search);
+        instanceToken = parentParams.get('instance') || parentParams.get('instanceToken') || null;
+        if (instanceToken) {
+          console.log('[MapsyWidget] Instance token found in parent frame URL');
+        }
+      } catch (e) {
+        // Cross-origin - can't access parent URL
+        console.log('[MapsyWidget] Cannot access parent frame URL (cross-origin)');
+      }
+    }
+
+    // Check for Wix-provided global variables
+    if (!instanceToken && typeof window !== 'undefined') {
+      const wixData = (window as any).wixData || (window as any).__WIXDATA__;
+      if (wixData && wixData.instance) {
+        instanceToken = wixData.instance;
+        console.log('[MapsyWidget] Instance token found in window.wixData');
+      }
+    }
+
+    if (instanceToken) {
+      console.log('[MapsyWidget] Instance token found:', instanceToken.substring(0, 20) + '...');
+    } else {
+      console.log('[MapsyWidget] No instance token found in attributes, URL, or globals - will try SDK');
+    }
+
+    // Listen for instance token from parent window via postMessage
+    this.setupPostMessageListener();
+
+    // Initialize Wix service with explicit token and compId
     console.log('[MapsyWidget] Initializing Wix client...');
-    await wixService.initialize(compId || undefined);
+    await wixService.initialize(compId || undefined, instanceToken || undefined);
 
     // Log the result
     if (wixService.isInitialized()) {
@@ -115,6 +161,25 @@ class MapsyWidgetElement extends HTMLElement {
       case 'api-url':
         this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
         break;
+      case 'instance':
+      case 'instance-token':
+        // Update instance token in wixService
+        if (newValue) {
+          console.log('[MapsyWidgetElement] Instance token updated via attribute');
+          const compId = this.getAttribute('compid');
+          wixService.initialize(compId || undefined, newValue);
+        }
+        // Don't re-render for instance token changes
+        return;
+      case 'compid':
+        // Update compId in wixService
+        if (newValue) {
+          console.log('[MapsyWidgetElement] CompId updated via attribute');
+          const instanceToken = this.getAttribute('instance') || this.getAttribute('instance-token');
+          wixService.initialize(newValue, instanceToken || undefined);
+        }
+        // Don't re-render for compId changes
+        return;
       case 'config':
         // Handle full config as JSON
         try {
@@ -199,9 +264,65 @@ class MapsyWidgetElement extends HTMLElement {
     );
   }
 
+  private setupPostMessageListener() {
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('message', (event) => {
+      // Only accept messages from Wix domains or parent
+      const trustedOrigins = [
+        'https://www.wix.com',
+        'https://editor.wix.com',
+        'https://manage.wix.com',
+      ];
+
+      // Check if message is from trusted origin or same origin
+      const isTrusted = trustedOrigins.some(origin => event.origin.includes(origin)) ||
+                       event.origin === window.location.origin;
+
+      if (!isTrusted && event.source !== window.parent) {
+        return;
+      }
+
+      console.log('[MapsyWidget] Received postMessage:', event.data);
+
+      // Handle different message types
+      if (event.data && typeof event.data === 'object') {
+        // Wix might send instance token via postMessage
+        if (event.data.instance || event.data.instanceToken) {
+          const token = event.data.instance || event.data.instanceToken;
+          console.log('[MapsyWidget] Instance token received via postMessage');
+          wixService.setInstanceToken(token);
+        }
+
+        // Handle compId
+        if (event.data.compId) {
+          console.log('[MapsyWidget] CompId received via postMessage');
+          wixService.setCompId(event.data.compId);
+        }
+
+        // Handle config updates
+        if (event.data.type === 'wix-config-update' && event.data.config) {
+          console.log('[MapsyWidget] Config update received via postMessage');
+          this.config = { ...this.config, ...event.data.config };
+          if (this.root) {
+            this.mountReactApp();
+          }
+        }
+      }
+    });
+
+    console.log('[MapsyWidget] PostMessage listener set up');
+
+    // Request instance token from parent if we don't have it
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'wix-widget-ready', request: 'instance' }, '*');
+      console.log('[MapsyWidget] Requested instance token from parent');
+    }
+  }
+
   private setupWixListeners() {
     // In Wix environment, updates come through setProp which updates attributes directly
-    // No need for message listeners
+    // No need for additional message listeners beyond postMessage
     console.log('[MapsyWidgetElement] Ready to receive Wix updates via setProp');
   }
 
