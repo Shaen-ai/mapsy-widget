@@ -202,6 +202,46 @@ class WixService {
     return this.wixClient;
   }
 
+  // Detect if running in Wix Editor preview mode
+  isEditorPreview(): boolean {
+    if (typeof window === 'undefined') return false;
+
+    const url = window.location.href;
+    // Check for editor preview indicators
+    return url.includes('parastorage.com') ||
+           url.includes('thunderboltPreview') ||
+           url.includes('CustomElementPreviewIframe') ||
+           url.includes('editor-elements-library');
+  }
+
+  // Get authentication status for UI display
+  getAuthStatus(): { hasAuth: boolean; isPreview: boolean; message: string } {
+    const isPreview = this.isEditorPreview();
+    const hasAuth = this.instanceToken !== null;
+
+    if (isPreview && !hasAuth) {
+      return {
+        hasAuth: false,
+        isPreview: true,
+        message: 'Editor Preview Mode - No authentication available. Publish your site to test multi-tenancy.'
+      };
+    }
+
+    if (!hasAuth) {
+      return {
+        hasAuth: false,
+        isPreview: false,
+        message: 'No authentication - Running in standalone mode'
+      };
+    }
+
+    return {
+      hasAuth: true,
+      isPreview: false,
+      message: 'Authenticated with Wix instance'
+    };
+  }
+
   // Use Wix SDK's fetchWithAuth if available
   async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
     if (this.wixClient && typeof this.wixClient.fetchWithAuth === 'function') {
