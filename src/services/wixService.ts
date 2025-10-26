@@ -48,21 +48,35 @@ class WixService {
         if (this.wixClient) {
           // Method 1: Check if client has auth property
           if (this.wixClient.auth) {
-            console.log('[WixService] Found auth on client:', Object.keys(this.wixClient.auth));
+            const authKeys = Object.keys(this.wixClient.auth);
+            console.log('[WixService] Found auth on client:', authKeys);
+            console.log('[WixService] Auth object:', this.wixClient.auth);
+
+            // Log what each property is
+            authKeys.forEach(key => {
+              const value = this.wixClient.auth[key];
+              console.log(`[WixService] auth.${key}:`, typeof value, value);
+            });
 
             // Try different methods to get the token
             if (typeof this.wixClient.auth.getAccessTokenFunction === 'function') {
+              console.log('[WixService] Calling getAccessTokenFunction...');
               const tokenFunc = this.wixClient.auth.getAccessTokenFunction();
+              console.log('[WixService] Token function:', typeof tokenFunc);
               if (typeof tokenFunc === 'function') {
                 this.instanceToken = await tokenFunc();
                 console.log('[WixService] ✅ Got token from getAccessTokenFunction');
               }
             } else if (typeof this.wixClient.auth.getAccessToken === 'function') {
+              console.log('[WixService] Calling getAccessToken...');
               this.instanceToken = await this.wixClient.auth.getAccessToken();
               console.log('[WixService] ✅ Got token from getAccessToken');
             } else if (this.wixClient.auth.accessToken) {
               this.instanceToken = this.wixClient.auth.accessToken;
               console.log('[WixService] ✅ Got token from auth.accessToken');
+            } else {
+              console.warn('[WixService] ⚠️ None of the expected auth methods are available');
+              console.warn('[WixService] Available auth keys:', authKeys);
             }
           }
 
