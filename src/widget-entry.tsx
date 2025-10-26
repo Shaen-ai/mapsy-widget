@@ -1,7 +1,5 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
 import './index.css'
+import './MapsyWidgetElement'
 
 declare global {
   interface Window {
@@ -15,9 +13,10 @@ declare global {
   }
 }
 
-class MapsyWidget {
-  private static initialized: boolean = false;
+// The custom element <mapsy-widget> is now registered by MapsyWidgetElement.tsx
+// This file just provides the global API for backward compatibility
 
+class MapsyWidget {
   static init(selectorOrConfig?: string | HTMLElement | any, config?: any) {
     // Handle different parameter types
     if (!selectorOrConfig) {
@@ -37,7 +36,7 @@ class MapsyWidget {
           : document.querySelector(configObj.container);
 
         if (element) {
-          this.renderWidget(element as HTMLElement, configObj);
+          this.createWidget(element as HTMLElement, configObj);
         } else {
           console.error(`Element not found:`, configObj.container);
         }
@@ -66,76 +65,64 @@ class MapsyWidget {
       return;
     }
 
-    this.renderWidget(element, config);
+    this.createWidget(element, config);
   }
 
   static autoInit() {
-    // Find all mapsy-widget elements
+    console.log('[MapsyWidget] Auto-initializing...');
+    // Custom element <mapsy-widget> automatically initializes itself via connectedCallback
+    // This function is here for backward compatibility
+
+    // Check if there are any mapsy-widget elements
     const widgets = document.querySelectorAll('mapsy-widget');
+    console.log(`[MapsyWidget] Found ${widgets.length} <mapsy-widget> elements`);
 
     if (widgets.length === 0) {
-      console.warn('No <mapsy-widget> elements found on the page');
-      return;
+      console.log('[MapsyWidget] No <mapsy-widget> elements found. Custom elements will auto-initialize when added to DOM.');
     }
-
-    widgets.forEach((element) => {
-      const widgetElement = element as HTMLElement;
-
-      // Extract configuration from data attributes
-      const config: any = {};
-
-      // Get all data attributes
-      if (widgetElement.dataset.apiUrl) {
-        config.apiUrl = widgetElement.dataset.apiUrl;
-      }
-      if (widgetElement.dataset.defaultView) {
-        config.defaultView = widgetElement.dataset.defaultView;
-      }
-      if (widgetElement.dataset.showHeader !== undefined) {
-        config.showHeader = widgetElement.dataset.showHeader === 'true';
-      }
-      if (widgetElement.dataset.headerTitle) {
-        config.headerTitle = widgetElement.dataset.headerTitle;
-      }
-      if (widgetElement.dataset.mapZoomLevel) {
-        config.mapZoomLevel = parseInt(widgetElement.dataset.mapZoomLevel, 10);
-      }
-      if (widgetElement.dataset.primaryColor) {
-        config.primaryColor = widgetElement.dataset.primaryColor;
-      }
-
-      // Also support a single data-config attribute with JSON
-      if (widgetElement.dataset.config) {
-        try {
-          const jsonConfig = JSON.parse(widgetElement.dataset.config);
-          Object.assign(config, jsonConfig);
-        } catch (error) {
-          console.error('Invalid JSON in data-config attribute:', error);
-        }
-      }
-
-      this.renderWidget(widgetElement, config);
-    });
-
-    this.initialized = true;
   }
 
-  private static renderWidget(element: HTMLElement, config?: any) {
-    // Add a marker to prevent duplicate initialization
-    if (element.dataset.mapsyInitialized === 'true') {
-      console.warn('Widget already initialized on this element');
+  private static createWidget(element: HTMLElement, config?: any) {
+    console.log('[MapsyWidget] Creating widget on element:', element);
+
+    // If element is already a mapsy-widget, just update its config
+    if (element.tagName.toLowerCase() === 'mapsy-widget') {
+      if (config) {
+        // Update attributes based on config
+        if (config.apiUrl) element.setAttribute('api-url', config.apiUrl);
+        if (config.defaultView) element.setAttribute('default-view', config.defaultView);
+        if (config.showHeader !== undefined) element.setAttribute('show-header', String(config.showHeader));
+        if (config.headerTitle) element.setAttribute('header-title', config.headerTitle);
+        if (config.mapZoomLevel) element.setAttribute('map-zoom-level', String(config.mapZoomLevel));
+        if (config.primaryColor) element.setAttribute('primary-color', config.primaryColor);
+        if (config.instance) element.setAttribute('instance', config.instance);
+        if (config.instanceToken) element.setAttribute('instance-token', config.instanceToken);
+        if (config.compId) element.setAttribute('compid', config.compId);
+      }
       return;
     }
 
-    const root = ReactDOM.createRoot(element);
-    root.render(
-      <React.StrictMode>
-        <App {...config} />
-      </React.StrictMode>
-    );
+    // Otherwise, create a new mapsy-widget element inside
+    const widget = document.createElement('mapsy-widget');
 
-    // Mark as initialized
-    element.dataset.mapsyInitialized = 'true';
+    // Apply configuration as attributes
+    if (config) {
+      if (config.apiUrl) widget.setAttribute('api-url', config.apiUrl);
+      if (config.defaultView) widget.setAttribute('default-view', config.defaultView);
+      if (config.showHeader !== undefined) widget.setAttribute('show-header', String(config.showHeader));
+      if (config.headerTitle) widget.setAttribute('header-title', config.headerTitle);
+      if (config.mapZoomLevel) widget.setAttribute('map-zoom-level', String(config.mapZoomLevel));
+      if (config.primaryColor) widget.setAttribute('primary-color', config.primaryColor);
+      if (config.instance) widget.setAttribute('instance', config.instance);
+      if (config.instanceToken) widget.setAttribute('instance-token', config.instanceToken);
+      if (config.compId) widget.setAttribute('compid', config.compId);
+    }
+
+    // Clear element and add widget
+    element.innerHTML = '';
+    element.appendChild(widget);
+
+    console.log('[MapsyWidget] Widget created with custom element');
   }
 
   static getVersion() {
