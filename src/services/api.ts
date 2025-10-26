@@ -20,21 +20,23 @@ export const initializeApi = (apiUrl?: string) => {
 
   // Add request interceptor to include Wix instance token
   apiInstance.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
-      const instanceToken = wixService.getInstanceToken();
+    async (config: InternalAxiosRequestConfig) => {
+      console.log('[API Interceptor] Preparing request to:', config.url);
+
+      // Get fresh access token from Wix SDK
+      const instanceToken = await wixService.getAccessToken();
       const compId = wixService.getCompId();
 
-      console.log('[API Interceptor] Preparing request to:', config.url);
       console.log('[API Interceptor] Instance token available:', instanceToken ? 'YES' : 'NO');
       console.log('[API Interceptor] Comp ID available:', compId ? compId : 'NO');
 
       if (instanceToken) {
         // Add Authorization header with Bearer token
         config.headers.Authorization = `Bearer ${instanceToken}`;
-        console.log('[API] ✅ Added Wix instance token to request');
+        console.log('[API] ✅ Added Wix access token to request');
         console.log('[API] Token preview:', instanceToken.substring(0, 20) + '...');
       } else {
-        console.warn('[API] ⚠️ No instance token available - request will be sent without authentication');
+        console.warn('[API] ⚠️ No access token available - request will be sent without authentication');
       }
 
       if (compId) {

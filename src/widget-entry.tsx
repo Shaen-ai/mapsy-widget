@@ -95,8 +95,6 @@ class MapsyWidget {
         if (config.headerTitle) element.setAttribute('header-title', config.headerTitle);
         if (config.mapZoomLevel) element.setAttribute('map-zoom-level', String(config.mapZoomLevel));
         if (config.primaryColor) element.setAttribute('primary-color', config.primaryColor);
-        if (config.instance) element.setAttribute('instance', config.instance);
-        if (config.instanceToken) element.setAttribute('instance-token', config.instanceToken);
         if (config.compId) element.setAttribute('compid', config.compId);
       }
       return;
@@ -113,8 +111,6 @@ class MapsyWidget {
       if (config.headerTitle) widget.setAttribute('header-title', config.headerTitle);
       if (config.mapZoomLevel) widget.setAttribute('map-zoom-level', String(config.mapZoomLevel));
       if (config.primaryColor) widget.setAttribute('primary-color', config.primaryColor);
-      if (config.instance) widget.setAttribute('instance', config.instance);
-      if (config.instanceToken) widget.setAttribute('instance-token', config.instanceToken);
       if (config.compId) widget.setAttribute('compid', config.compId);
     }
 

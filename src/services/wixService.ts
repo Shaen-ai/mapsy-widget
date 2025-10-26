@@ -1,10 +1,12 @@
-import { createClient, WixClient } from '@wix/sdk';
+import { createClient } from '@wix/sdk';
+import { site } from '@wix/site';
 
 class WixService {
   private static instance: WixService;
-  private wixClient: WixClient | null = null;
+  private wixClient: any = null;
   private instanceToken: string | null = null;
   private compId: string | null = null;
+  private accessTokenInjector: any = null;
 
   private constructor() {}
 
@@ -15,50 +17,80 @@ class WixService {
     return WixService.instance;
   }
 
-  async initialize(compId?: string, explicitInstanceToken?: string): Promise<void> {
+  async initialize(compId?: string): Promise<void> {
     try {
-      console.log('[WixService] Initializing Wix client...');
+      console.log('[WixService] Initializing with Wix Site SDK...');
       console.log('[WixService] Environment:', typeof window !== 'undefined' ? 'Browser' : 'Server');
-      console.log('[WixService] User agent:', typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 50) : 'N/A');
 
       // Store compId if provided
       if (compId) {
         this.compId = compId;
         console.log('[WixService] Component ID stored:', compId);
-      } else {
-        console.log('[WixService] No component ID provided');
       }
 
-      // Use explicit instance token if provided (from attributes, URL, postMessage, or globals)
-      if (explicitInstanceToken) {
-        this.instanceToken = explicitInstanceToken;
-        console.log('[WixService] ✅ Using explicit instance token');
-        console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+      // Create Wix Client using site.auth() and site.host()
+      // This is the official Wix pattern for self-hosted custom elements
+      this.wixClient = createClient({
+        auth: site.auth(),
+        host: site.host(),
+      });
 
-        // Create a minimal Wix client for compatibility
-        try {
-          this.wixClient = createClient({});
-          console.log('[WixService] Wix client created for compatibility');
-        } catch (error) {
-          console.log('[WixService] Could not create Wix client, will work without it');
+      console.log('[WixService] ✅ Wix client created with site authentication');
+
+      // Get access token injector
+      // This provides the authentication token for API calls
+      try {
+        this.accessTokenInjector = this.wixClient.auth.getAccessTokenFunction?.();
+
+        // Try to get the token immediately
+        if (this.accessTokenInjector && typeof this.accessTokenInjector === 'function') {
+          this.instanceToken = await this.accessTokenInjector();
+          console.log('[WixService] ✅ Access token retrieved via injector');
+          console.log('[WixService] Token preview:', this.instanceToken ? this.instanceToken.substring(0, 20) + '...' : 'null');
+        } else {
+          console.log('[WixService] Access token injector not available as function');
         }
-      } else {
-        console.log('[WixService] ⚠️ No instance token provided');
-        console.log('[WixService] For self-hosted widgets, instance token should come from:');
-        console.log('[WixService]   - Element attributes (instance, instance-token)');
-        console.log('[WixService]   - URL parameters (?instance=...)');
-        console.log('[WixService]   - PostMessage from parent window');
-        console.log('[WixService]   - Global variables (window.wixData)');
+      } catch (tokenError) {
+        console.error('[WixService] Error getting access token:', tokenError);
+      }
+
+      // Alternative: Try to get logged in member's token
+      try {
+        if (this.wixClient.auth.loggedIn) {
+          const memberTokens = await this.wixClient.auth.loggedIn();
+          if (memberTokens && memberTokens.accessToken) {
+            this.instanceToken = memberTokens.accessToken;
+            console.log('[WixService] ✅ Got access token from logged in member');
+          }
+        }
+      } catch (err) {
+        console.log('[WixService] Not a logged in member context');
       }
 
     } catch (error) {
       console.error('[WixService] Failed to initialize Wix client:', error);
       console.error('[WixService] Error details:', error instanceof Error ? error.message : String(error));
-      // Don't throw - allow widget to work without Wix in development
+      console.error('[WixService] Stack:', error instanceof Error ? error.stack : 'No stack');
     }
   }
 
   getInstanceToken(): string | null {
+    return this.instanceToken;
+  }
+
+  async getAccessToken(): Promise<string | null> {
+    // Try to get fresh token from injector
+    if (this.accessTokenInjector && typeof this.accessTokenInjector === 'function') {
+      try {
+        const token = await this.accessTokenInjector();
+        if (token) {
+          this.instanceToken = token;
+          return token;
+        }
+      } catch (err) {
+        console.error('[WixService] Error calling access token injector:', err);
+      }
+    }
     return this.instanceToken;
   }
 
@@ -77,12 +109,27 @@ class WixService {
   }
 
   isInitialized(): boolean {
-    // For self-hosted widgets, having an instance token is sufficient
-    return this.instanceToken !== null;
+    return this.wixClient !== null;
   }
 
-  getWixClient(): WixClient | null {
+  getWixClient(): any {
     return this.wixClient;
+  }
+
+  // Wix's recommended way to call backend with authentication
+  async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
+    if (!this.wixClient) {
+      console.warn('[WixService] Wix client not initialized, making unauthenticated request');
+      return fetch(url, options);
+    }
+
+    try {
+      // Use Wix's fetchWithAuth method
+      return await this.wixClient.fetchWithAuth(url, options);
+    } catch (error) {
+      console.error('[WixService] Error in fetchWithAuth:', error);
+      throw error;
+    }
   }
 }
 
