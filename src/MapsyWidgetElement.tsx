@@ -21,7 +21,9 @@ class MapsyWidgetElement extends HTMLElement {
 
   constructor() {
     super();
-    console.log('[MapsyWidgetElement] Constructor called');
+    console.log('[MapsyWidgetElement] ========================================');
+    console.log('[MapsyWidgetElement] CONSTRUCTOR CALLED!');
+    console.log('[MapsyWidgetElement] ========================================');
     this.attachShadow({ mode: 'open' });
   }
 
@@ -45,6 +47,10 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   async connectedCallback() {
+    console.log('[MapsyWidget] ========================================');
+    console.log('[MapsyWidget] connectedCallback CALLED!');
+    console.log('[MapsyWidget] ========================================');
+
     // Prevent double initialization
     if (this._initialized) {
       console.log('[MapsyWidget] Already initialized, skipping connectedCallback');
@@ -55,15 +61,17 @@ class MapsyWidgetElement extends HTMLElement {
       console.log('[MapsyWidget] === connectedCallback START ===');
       console.log('[MapsyWidget] Connected to DOM');
       console.log('[MapsyWidget] All attributes:', this.getAttributeNames());
+      console.log('[MapsyWidget] Current URL:', window.location.href);
+      console.log('[MapsyWidget] URL search params:', window.location.search);
 
       // Try to get compId from various attribute formats
       const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id');
       console.log('[MapsyWidget] CompId from attributes:', compId);
 
-      // Initialize Wix service with compId
-      // The Wix SDK will handle token retrieval automatically via site.auth()
-      console.log('[MapsyWidget] Initializing Wix client with site.auth()...');
+      // Initialize Wix service
+      console.log('[MapsyWidget] Calling wixService.initialize()...');
       await wixService.initialize(compId || undefined);
+      console.log('[MapsyWidget] wixService.initialize() completed');
 
       // Log the result
       if (wixService.isInitialized()) {
