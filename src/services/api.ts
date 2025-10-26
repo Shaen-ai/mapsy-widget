@@ -24,15 +24,44 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
 
   const instanceToken = wixService.getInstanceToken();
   const compId = wixService.getCompId();
+  const wixClient = wixService.getWixClient();
 
   console.log('[API] Instance token available:', instanceToken ? 'YES' : 'NO');
   console.log('[API] Comp ID available:', compId || 'NO');
+  console.log('[API] Wix client available:', wixClient ? 'YES' : 'NO');
 
-  // Build headers
+  // Try to use Wix SDK's fetchWithAuth if available
+  if (wixClient && typeof wixClient.fetchWithAuth === 'function') {
+    console.log('[API] Using Wix SDK fetchWithAuth (automatically authenticated)');
+
+    const headers = new Headers(options?.headers);
+    headers.set('Content-Type', 'application/json');
+
+    if (compId) {
+      headers.set('X-Wix-Comp-Id', compId);
+      console.log('[API] ✅ Added X-Wix-Comp-Id header:', compId);
+    }
+
+    try {
+      const response = await wixClient.fetchWithAuth(url, {
+        ...options,
+        headers,
+      });
+
+      console.log('[API] ✅ Request completed with status:', response.status);
+      return response;
+    } catch (error) {
+      console.error('[API] ❌ Wix fetchWithAuth failed:', error);
+      throw error;
+    }
+  }
+
+  // Fallback to manual token injection
+  console.log('[API] Using manual token injection');
+
   const headers = new Headers(options?.headers);
   headers.set('Content-Type', 'application/json');
 
-  // Add instance token if available
   if (instanceToken) {
     headers.set('Authorization', `Bearer ${instanceToken}`);
     console.log('[API] ✅ Added Authorization header with instance token');
@@ -41,7 +70,6 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
     console.warn('[API] ⚠️ No instance token - request will be unauthenticated');
   }
 
-  // Add compId if available
   if (compId) {
     headers.set('X-Wix-Comp-Id', compId);
     console.log('[API] ✅ Added X-Wix-Comp-Id header:', compId);

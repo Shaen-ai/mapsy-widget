@@ -1,5 +1,8 @@
+import { createClient } from '@wix/sdk';
+
 class WixService {
   private static instance: WixService;
+  private wixClient: any = null;
   private instanceToken: string | null = null;
   private compId: string | null = null;
 
@@ -14,8 +17,11 @@ class WixService {
 
   async initialize(compId?: string): Promise<void> {
     try {
-      console.log('[WixService] Initializing for script-embedded custom element...');
+      console.log('[WixService] ========================================');
+      console.log('[WixService] Initializing for Site Widget (Custom Element)...');
+      console.log('[WixService] ========================================');
       console.log('[WixService] Environment:', typeof window !== 'undefined' ? 'Browser' : 'Server');
+      console.log('[WixService] Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
 
       // Store compId if provided
       if (compId) {
@@ -23,8 +29,72 @@ class WixService {
         console.log('[WixService] Component ID stored:', compId);
       }
 
-      // For script-embedded custom elements, instance token comes from URL or window context
-      await this.retrieveInstanceToken();
+      // For Site Widgets with "Enable frontend modules from Wix JavaScript SDK" toggle enabled,
+      // we create the client and it automatically gets the instance token
+      console.log('[WixService] Creating Wix SDK client...');
+
+      try {
+        // Create Wix client for Custom Element
+        // When SDK modules are enabled, Wix injects the authentication context
+        this.wixClient = createClient({
+          modules: {},
+        });
+
+        console.log('[WixService] ✅ Wix client created');
+        console.log('[WixService] Client object:', this.wixClient);
+        console.log('[WixService] Client keys:', Object.keys(this.wixClient || {}));
+
+        // Try to get instance token from the client
+        if (this.wixClient) {
+          // Method 1: Check if client has auth property
+          if (this.wixClient.auth) {
+            console.log('[WixService] Found auth on client:', Object.keys(this.wixClient.auth));
+
+            // Try different methods to get the token
+            if (typeof this.wixClient.auth.getAccessTokenFunction === 'function') {
+              const tokenFunc = this.wixClient.auth.getAccessTokenFunction();
+              if (typeof tokenFunc === 'function') {
+                this.instanceToken = await tokenFunc();
+                console.log('[WixService] ✅ Got token from getAccessTokenFunction');
+              }
+            } else if (typeof this.wixClient.auth.getAccessToken === 'function') {
+              this.instanceToken = await this.wixClient.auth.getAccessToken();
+              console.log('[WixService] ✅ Got token from getAccessToken');
+            } else if (this.wixClient.auth.accessToken) {
+              this.instanceToken = this.wixClient.auth.accessToken;
+              console.log('[WixService] ✅ Got token from auth.accessToken');
+            }
+          }
+
+          // Method 2: Check global Wix SDK context
+          if (!this.instanceToken && typeof window !== 'undefined') {
+            const wixSdk = (window as any).__WIXSDK__ || (window as any).wixSdk || (window as any).WixSDK;
+            if (wixSdk) {
+              console.log('[WixService] Found global Wix SDK:', Object.keys(wixSdk));
+              if (wixSdk.instance) {
+                this.instanceToken = wixSdk.instance;
+                console.log('[WixService] ✅ Got token from global SDK');
+              }
+            }
+          }
+        }
+
+        if (this.instanceToken) {
+          console.log('[WixService] ✅ Instance token retrieved');
+          console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+          console.log('[WixService] Token length:', this.instanceToken.length);
+        } else {
+          console.warn('[WixService] ⚠️ No instance token available from SDK');
+          // Fallback to manual retrieval
+          await this.fallbackTokenRetrieval();
+        }
+
+      } catch (sdkError) {
+        console.error('[WixService] Error creating Wix SDK client:', sdkError);
+        console.error('[WixService] Error details:', sdkError instanceof Error ? sdkError.message : String(sdkError));
+        // Fallback to manual token retrieval
+        await this.fallbackTokenRetrieval();
+      }
 
     } catch (error) {
       console.error('[WixService] Failed to initialize:', error);
@@ -32,10 +102,10 @@ class WixService {
     }
   }
 
-  private async retrieveInstanceToken(): Promise<void> {
-    console.log('[WixService] Attempting to retrieve instance token...');
+  private async fallbackTokenRetrieval(): Promise<void> {
+    console.log('[WixService] Attempting fallback token retrieval...');
 
-    // Method 1: Check URL parameters (current window)
+    // Check URL parameters
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const urlToken = urlParams.get('instance') || urlParams.get('instanceToken');
@@ -45,87 +115,26 @@ class WixService {
         console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
         return;
       }
-    }
 
-    // Method 2: Check parent/top window URL (iframe scenario)
-    if (typeof window !== 'undefined' && window.location !== window.parent.location) {
-      try {
-        const parentUrl = new URL(window.parent.location.href);
-        const parentParams = new URLSearchParams(parentUrl.search);
-        const parentToken = parentParams.get('instance') || parentParams.get('instanceToken');
-        if (parentToken) {
-          this.instanceToken = parentToken;
-          console.log('[WixService] ✅ Instance token found in parent window URL');
-          console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
-          return;
-        }
-      } catch (e) {
-        console.log('[WixService] Cannot access parent URL (cross-origin)');
-      }
-    }
-
-    // Method 3: Check Wix global variables
-    if (typeof window !== 'undefined') {
-      const wixData = (window as any).wixData || (window as any).__WIXDATA__ || (window as any).Wix;
-      if (wixData) {
-        console.log('[WixService] Found Wix global object:', Object.keys(wixData));
-
-        if (wixData.instance) {
-          this.instanceToken = wixData.instance;
-          console.log('[WixService] ✅ Instance token found in window.wixData');
-          console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
-          return;
-        }
-
-        if (wixData.Utils && wixData.Utils.getInstanceValue) {
+      // Check global Wix object
+      const wixGlobal = (window as any).Wix || (window as any).wixData;
+      if (wixGlobal) {
+        console.log('[WixService] Found Wix global:', Object.keys(wixGlobal));
+        if (wixGlobal.Utils && typeof wixGlobal.Utils.getInstanceValue === 'function') {
           try {
-            this.instanceToken = await wixData.Utils.getInstanceValue('instance');
+            this.instanceToken = await wixGlobal.Utils.getInstanceValue('instance');
             if (this.instanceToken) {
-              console.log('[WixService] ✅ Instance token retrieved via Wix.Utils');
-              console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+              console.log('[WixService] ✅ Got token from Wix.Utils');
               return;
             }
           } catch (err) {
-            console.log('[WixService] Failed to get instance via Wix.Utils:', err);
+            console.log('[WixService] Failed to get instance from Wix.Utils:', err);
           }
         }
       }
-    }
 
-    // Method 4: Setup postMessage listener for Wix to send token
-    if (typeof window !== 'undefined') {
-      console.log('[WixService] Setting up postMessage listener for instance token...');
-
-      window.addEventListener('message', (event) => {
-        // Accept messages from Wix domains
-        const wixOrigins = ['wix.com', 'wixsite.com', 'editorx.com'];
-        const isTrusted = wixOrigins.some(origin => event.origin.includes(origin));
-
-        if (isTrusted && event.data) {
-          if (event.data.instance || event.data.instanceToken) {
-            const token = event.data.instance || event.data.instanceToken;
-            this.instanceToken = token;
-            console.log('[WixService] ✅ Instance token received via postMessage');
-            console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
-          }
-
-          if (event.data.compId) {
-            this.compId = event.data.compId;
-            console.log('[WixService] ✅ CompId received via postMessage:', this.compId);
-          }
-        }
-      });
-
-      // Request instance token from parent
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: 'request-instance', source: 'mapsy-widget' }, '*');
-        console.log('[WixService] Sent request for instance token to parent window');
-      }
-    }
-
-    if (!this.instanceToken) {
       console.warn('[WixService] ⚠️ No instance token found');
-      console.warn('[WixService] Widget will run in standalone mode without multi-tenancy');
+      console.warn('[WixService] Widget will run without multi-tenancy');
     }
   }
 
@@ -152,9 +161,30 @@ class WixService {
     return this.instanceToken !== null;
   }
 
-  // For compatibility - returns null since we don't use Wix SDK for script-embedded widgets
   getWixClient(): any {
-    return null;
+    return this.wixClient;
+  }
+
+  // Use Wix SDK's fetchWithAuth if available
+  async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
+    if (this.wixClient && typeof this.wixClient.fetchWithAuth === 'function') {
+      console.log('[WixService] Using Wix SDK fetchWithAuth');
+      return await this.wixClient.fetchWithAuth(url, options);
+    }
+
+    // Fallback to regular fetch with manual token
+    console.log('[WixService] Using regular fetch with manual token');
+    const headers = new Headers(options?.headers);
+
+    if (this.instanceToken) {
+      headers.set('Authorization', `Bearer ${this.instanceToken}`);
+    }
+
+    if (this.compId) {
+      headers.set('X-Wix-Comp-Id', this.compId);
+    }
+
+    return await fetch(url, { ...options, headers });
   }
 }
 
