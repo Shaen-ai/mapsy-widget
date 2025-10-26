@@ -58,8 +58,29 @@ class WixService {
               console.log(`[WixService] auth.${key}:`, typeof value, value);
             });
 
+            // Try to get auth headers
+            if (typeof this.wixClient.auth.getAuthHeaders === 'function') {
+              console.log('[WixService] Calling getAuthHeaders()...');
+              try {
+                const authHeaders = await this.wixClient.auth.getAuthHeaders();
+                console.log('[WixService] Auth headers:', authHeaders);
+
+                // Check if headers contain Authorization
+                if (authHeaders && authHeaders.headers && authHeaders.headers.Authorization) {
+                  const authHeader = authHeaders.headers.Authorization;
+                  if (authHeader.startsWith('Bearer ')) {
+                    this.instanceToken = authHeader.substring(7);
+                    console.log('[WixService] ✅ Got instance token from getAuthHeaders');
+                    console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+                  }
+                }
+              } catch (err) {
+                console.log('[WixService] Error calling getAuthHeaders:', err);
+              }
+            }
+
             // Try different methods to get the token
-            if (typeof this.wixClient.auth.getAccessTokenFunction === 'function') {
+            if (!this.instanceToken && typeof this.wixClient.auth.getAccessTokenFunction === 'function') {
               console.log('[WixService] Calling getAccessTokenFunction...');
               const tokenFunc = this.wixClient.auth.getAccessTokenFunction();
               console.log('[WixService] Token function:', typeof tokenFunc);
