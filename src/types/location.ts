@@ -20,6 +20,8 @@ export interface Location {
   image_url?: string;
   latitude?: number;
   longitude?: number;
+  instanceId?: string;
+  compId?: string;
   created_at?: string;
   updated_at?: string;
 }

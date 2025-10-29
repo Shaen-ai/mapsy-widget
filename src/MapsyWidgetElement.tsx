@@ -41,7 +41,8 @@ class MapsyWidgetElement extends HTMLElement {
       'primary-color',
       'primarycolor',
       'api-url',
-      'compid',  // Wix component ID
+      'compid',  // Wix component ID (legacy attribute)
+      'comp-id',
       'config'  // Support full config as JSON string
     ];
   }
@@ -65,12 +66,27 @@ class MapsyWidgetElement extends HTMLElement {
       console.log('[MapsyWidget] URL search params:', window.location.search);
 
       // Try to get compId from various attribute formats
-      const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id');
+      const datasetCompId = this.dataset?.compId || (this.dataset as any)?.compid;
+      const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id') || datasetCompId;
       console.log('[MapsyWidget] CompId from attributes:', compId);
+      if (!this.getAttribute('compid') && compId) {
+        this.setAttribute('compid', compId);
+      }
+
+      // Try to get instance token from dataset/attributes (Wix often injects these)
+      const attrInstance =
+        this.getAttribute('data-instance') ||
+        this.getAttribute('instance') ||
+        this.dataset?.instance ||
+        (this.dataset as any)?.instanceToken ||
+        (this.dataset as any)?.instancetoken;
+      if (attrInstance) {
+        console.log('[MapsyWidget] Instance token found on element attributes');
+      }
 
       // Initialize Wix service
       console.log('[MapsyWidget] Calling wixService.initialize()...');
-      await wixService.initialize(compId || undefined);
+      await wixService.initialize(compId || undefined, attrInstance || undefined);
       console.log('[MapsyWidget] wixService.initialize() completed');
 
       // Log the result
@@ -147,10 +163,11 @@ class MapsyWidgetElement extends HTMLElement {
         this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
         break;
       case 'compid':
+      case 'comp-id':
         // Update compId in wixService and re-initialize
         if (newValue) {
-          console.log('[MapsyWidgetElement] CompId updated via attribute, re-initializing...');
-          wixService.initialize(newValue);
+          console.log('[MapsyWidgetElement] CompId updated via attribute, updating Wix service state...');
+          wixService.setCompId(newValue);
         }
         // Don't re-render for compId changes
         return;

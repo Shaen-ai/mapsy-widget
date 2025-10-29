@@ -15,7 +15,7 @@ class WixService {
     return WixService.instance;
   }
 
-  async initialize(compId?: string): Promise<void> {
+  async initialize(compId?: string, instanceTokenOverride?: string): Promise<void> {
     try {
       console.log('[WixService] ========================================');
       console.log('[WixService] Initializing for Site Widget (Custom Element)...');
@@ -28,6 +28,11 @@ class WixService {
         this.compId = compId;
         console.log('[WixService] Component ID stored:', compId);
       }
+
+       // Allow explicit instance token to be passed in (from attributes/dataset)
+       if (instanceTokenOverride) {
+         this.setInstanceToken(instanceTokenOverride);
+       }
 
       // For Site Widgets with "Enable frontend modules from Wix JavaScript SDK" toggle enabled,
       // we create the client and it automatically gets the instance token
@@ -153,6 +158,26 @@ class WixService {
         return;
       }
 
+      // Check script or DOM dataset attributes
+      const currentScript = document.currentScript as HTMLScriptElement | null;
+      const datasetInstance = currentScript?.dataset?.instance;
+      if (!datasetInstance) {
+        // Try custom element dataset if it exists in DOM
+        const widgetElement = document.querySelector('mapsy-widget') as HTMLElement | null;
+        const widgetInstance = widgetElement?.getAttribute('data-instance') || widgetElement?.dataset?.instance;
+        if (widgetInstance) {
+          this.instanceToken = widgetInstance;
+          console.log('[WixService] ✅ Instance token retrieved from widget dataset');
+          console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+          return;
+        }
+      } else {
+        this.instanceToken = datasetInstance;
+        console.log('[WixService] ✅ Instance token retrieved from script dataset');
+        console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+        return;
+      }
+
       // Check global Wix object
       const wixGlobal = (window as any).Wix || (window as any).wixData;
       if (wixGlobal) {
@@ -180,6 +205,10 @@ class WixService {
   }
 
   setInstanceToken(token: string): void {
+    if (!token) {
+      return;
+    }
+
     this.instanceToken = token;
     console.log('[WixService] Instance token updated directly');
     console.log('[WixService] Token preview:', token.substring(0, 20) + '...');
