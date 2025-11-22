@@ -26,8 +26,16 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
   const compId = wixService.getCompId();
   const wixClient = wixService.getWixClient();
 
+  // Get decoded instance data (instanceId, appDefId, vendorProductId)
+  const instanceId = wixService.getInstanceId();
+  const appDefId = wixService.getAppDefId();
+  const vendorProductId = wixService.getVendorProductId();
+
   console.log('[API] Instance token available:', instanceToken ? 'YES' : 'NO');
   console.log('[API] Comp ID available:', compId || 'NO');
+  console.log('[API] Instance ID:', instanceId || 'NO');
+  console.log('[API] App Def ID:', appDefId || 'NO');
+  console.log('[API] Vendor Product ID (Plan):', vendorProductId || 'NO');
   console.log('[API] Wix client available:', wixClient ? 'YES' : 'NO');
 
   // Try to use Wix SDK's fetchWithAuth if available
@@ -40,6 +48,17 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
     if (compId) {
       headers.set('X-Wix-Comp-Id', compId);
       console.log('[API] ✅ Added X-Wix-Comp-Id header:', compId);
+    }
+
+    // Add decoded instance data as headers for easier backend access
+    if (instanceId) {
+      headers.set('X-Wix-Instance-Id', instanceId);
+    }
+    if (appDefId) {
+      headers.set('X-Wix-App-Def-Id', appDefId);
+    }
+    if (vendorProductId) {
+      headers.set('X-Wix-Vendor-Product-Id', vendorProductId);
     }
 
     try {
@@ -73,6 +92,17 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
   if (compId) {
     headers.set('X-Wix-Comp-Id', compId);
     console.log('[API] ✅ Added X-Wix-Comp-Id header:', compId);
+  }
+
+  // Add decoded instance data as headers for easier backend access
+  if (instanceId) {
+    headers.set('X-Wix-Instance-Id', instanceId);
+  }
+  if (appDefId) {
+    headers.set('X-Wix-App-Def-Id', appDefId);
+  }
+  if (vendorProductId) {
+    headers.set('X-Wix-Vendor-Product-Id', vendorProductId);
   }
 
   try {

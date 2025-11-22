@@ -1,12 +1,67 @@
 import { createClient } from '@wix/sdk';
 
+// Decoded Wix instance data
+interface WixInstanceData {
+  instanceId: string;
+  appDefId?: string;
+  vendorProductId?: string | null;
+}
+
 class WixService {
   private static instance: WixService;
   private wixClient: any = null;
   private instanceToken: string | null = null;
   private compId: string | null = null;
+  private decodedInstance: WixInstanceData | null = null;
 
   private constructor() {}
+
+  // Decode base64url to get the payload from the instance token
+  private decodeInstanceToken(token: string): WixInstanceData | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 2) {
+        console.warn('[WixService] Invalid token format - expected 2 parts');
+        return null;
+      }
+
+      // Try to decode both parts to find the payload (could be payload.signature or signature.payload)
+      for (const part of parts) {
+        try {
+          // Normalize base64url to base64
+          const normalized = part.replace(/-/g, '+').replace(/_/g, '/');
+          const padding = (4 - (normalized.length % 4)) % 4;
+          const base64 = normalized + '='.repeat(padding);
+
+          const decoded = atob(base64);
+          const payload = JSON.parse(decoded);
+
+          // Check if this is the payload (should have instanceId)
+          if (payload && typeof payload === 'object' && (payload.instanceId || payload.instance)) {
+            const instanceId = payload.instanceId ||
+              (typeof payload.instance === 'string' ? payload.instance : payload.instance?.instanceId);
+
+            if (instanceId) {
+              return {
+                instanceId,
+                appDefId: payload.appDefId,
+                vendorProductId: payload.vendorProductId || null,
+              };
+            }
+          }
+        } catch {
+          // This part wasn't the payload, try the other
+          continue;
+        }
+      }
+
+      console.warn('[WixService] Could not decode instance token payload');
+      return null;
+    } catch (err) {
+      console.error('[WixService] Error decoding instance token:', err);
+      return null;
+    }
+  }
 
   static getInstance(): WixService {
     if (!WixService.instance) {
@@ -125,6 +180,16 @@ class WixService {
           console.log('[WixService] ✅ Instance token retrieved');
           console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
           console.log('[WixService] Token length:', this.instanceToken.length);
+
+          // Decode the token to extract instanceId, appDefId, vendorProductId
+          const decoded = this.decodeInstanceToken(this.instanceToken);
+          if (decoded) {
+            this.decodedInstance = decoded;
+            console.log('[WixService] Decoded instance data:');
+            console.log('[WixService]   - instanceId:', decoded.instanceId);
+            console.log('[WixService]   - appDefId:', decoded.appDefId || 'N/A');
+            console.log('[WixService]   - vendorProductId (plan):', decoded.vendorProductId || 'N/A');
+          }
         } else {
           console.warn('[WixService] ⚠️ No instance token available from SDK');
           // Fallback to manual retrieval
@@ -155,6 +220,13 @@ class WixService {
         this.instanceToken = urlToken;
         console.log('[WixService] ✅ Instance token found in URL parameters');
         console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+
+        // Decode the token
+        const decoded = this.decodeInstanceToken(urlToken);
+        if (decoded) {
+          this.decodedInstance = decoded;
+          console.log('[WixService] Decoded instance data from URL token');
+        }
         return;
       }
 
@@ -212,6 +284,16 @@ class WixService {
     this.instanceToken = token;
     console.log('[WixService] Instance token updated directly');
     console.log('[WixService] Token preview:', token.substring(0, 20) + '...');
+
+    // Decode the token to extract instanceId, appDefId, vendorProductId
+    const decoded = this.decodeInstanceToken(token);
+    if (decoded) {
+      this.decodedInstance = decoded;
+      console.log('[WixService] Decoded instance data:');
+      console.log('[WixService]   - instanceId:', decoded.instanceId);
+      console.log('[WixService]   - appDefId:', decoded.appDefId || 'N/A');
+      console.log('[WixService]   - vendorProductId (plan):', decoded.vendorProductId || 'N/A');
+    }
   }
 
   getCompId(): string | null {
@@ -221,6 +303,26 @@ class WixService {
   setCompId(id: string): void {
     this.compId = id;
     console.log('[WixService] CompId updated directly');
+  }
+
+  // Get the decoded instanceId from the token
+  getInstanceId(): string | null {
+    return this.decodedInstance?.instanceId || null;
+  }
+
+  // Get the appDefId (application definition ID) from the token
+  getAppDefId(): string | null {
+    return this.decodedInstance?.appDefId || null;
+  }
+
+  // Get the vendorProductId (premium plan ID) from the token
+  getVendorProductId(): string | null {
+    return this.decodedInstance?.vendorProductId || null;
+  }
+
+  // Get all decoded instance data
+  getDecodedInstance(): WixInstanceData | null {
+    return this.decodedInstance;
   }
 
   isInitialized(): boolean {
