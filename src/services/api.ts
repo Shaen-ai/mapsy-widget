@@ -10,6 +10,9 @@ export const initializeApi = (apiUrl?: string) => {
   // Always use production URL unless explicitly overridden
   apiBaseUrl = apiUrl || PRODUCTION_API_URL;
   console.log('[API] Initialized with base URL:', apiBaseUrl);
+
+  // Here
+  wixService.initialize();
 };
 
 // Initialize with production URL

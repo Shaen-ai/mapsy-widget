@@ -133,7 +133,7 @@ class WixService {
                   if (authHeader.startsWith('Bearer ')) {
                     this.instanceToken = authHeader.substring(7);
                     console.log('[WixService] ✅ Got instance token from getAuthHeaders');
-                    console.log('[WixService] Token preview:', this.instanceToken.substring(0, 20) + '...');
+                    console.log('[WixService] Token preview:', this.instanceToken?.substring(0, 20) + '...');
                   }
                 }
               } catch (err) {
