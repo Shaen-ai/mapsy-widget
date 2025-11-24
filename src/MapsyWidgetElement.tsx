@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import wixService from './services/wixService';
 
 /**
  * Custom Element for Wix integration
@@ -64,39 +63,6 @@ class MapsyWidgetElement extends HTMLElement {
       console.log('[MapsyWidget] All attributes:', this.getAttributeNames());
       console.log('[MapsyWidget] Current URL:', window.location.href);
       console.log('[MapsyWidget] URL search params:', window.location.search);
-
-      // Try to get compId from various attribute formats
-      const datasetCompId = this.dataset?.compId || (this.dataset as any)?.compid;
-      const compId = this.getAttribute('compId') || this.getAttribute('compid') || this.getAttribute('comp-id') || datasetCompId;
-      console.log('[MapsyWidget] CompId from attributes:', compId);
-      if (!this.getAttribute('compid') && compId) {
-        this.setAttribute('compid', compId);
-      }
-
-      // Try to get instance token from dataset/attributes (Wix often injects these)
-      const attrInstance =
-        this.getAttribute('data-instance') ||
-        this.getAttribute('instance') ||
-        this.dataset?.instance ||
-        (this.dataset as any)?.instanceToken ||
-        (this.dataset as any)?.instancetoken;
-      if (attrInstance) {
-        console.log('[MapsyWidget] Instance token found on element attributes');
-      }
-
-      // Initialize Wix service
-      console.log('[MapsyWidget] Calling wixService.initialize()...');
-      await wixService.initialize(compId || undefined, attrInstance || undefined);
-      console.log('[MapsyWidget] wixService.initialize() completed');
-
-      // Log the result
-      if (wixService.isInitialized()) {
-        console.log('[MapsyWidget] ✅ Wix client initialized successfully');
-        console.log('[MapsyWidget] Instance token:', wixService.getInstanceToken() ? 'Available' : 'Not available');
-        console.log('[MapsyWidget] Comp ID:', wixService.getCompId() || 'Not set');
-      } else {
-        console.log('[MapsyWidget] ⚠️ Running in standalone mode (no Wix)');
-      }
 
       // Read initial attributes
       this.updateConfigFromAttributes();
@@ -164,11 +130,8 @@ class MapsyWidgetElement extends HTMLElement {
         break;
       case 'compid':
       case 'comp-id':
-        // Update compId in wixService and re-initialize
-        if (newValue) {
-          console.log('[MapsyWidgetElement] CompId updated via attribute, updating Wix service state...');
-          wixService.setCompId(newValue);
-        }
+        // Store compId if needed for future use
+        console.log('[MapsyWidgetElement] CompId attribute:', newValue);
         // Don't re-render for compId changes
         return;
       case 'config':

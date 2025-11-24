@@ -3,7 +3,6 @@ import MapView from './components/MapView';
 import ListView from './components/ListView';
 import { Location } from './types/location';
 import { locationService, widgetConfigService, initializeApi } from './services/api';
-import wixService from './services/wixService';
 import { FiMap, FiList } from 'react-icons/fi';
 
 interface WidgetConfig {
@@ -26,7 +25,6 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
   const [currentView, setCurrentView] = useState<'map' | 'list'>('map');
-  const [authStatus, setAuthStatus] = useState<{ hasAuth: boolean; isPreview: boolean; message: string } | null>(null);
   const [config, setConfig] = useState<WidgetConfig>({
     defaultView: 'map',
     showHeader: false, // Hide header by default
@@ -38,73 +36,20 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
   useEffect(() => {
     const initializeWidget = async () => {
-      console.log('[Widget] ========================================');
-      console.log('[Widget] Starting widget initialization...');
-      console.log('[Widget] ========================================');
+      console.log('[Widget] Initializing...');
 
-      // Note: WixService is already initialized by MapsyWidgetElement.connectedCallback
-      // We just need to update the API URL if provided
-      if (apiUrl) {
-        console.log('[Widget] Initializing API with custom URL:', apiUrl);
-        await initializeApi(apiUrl);
-      } else {
-        console.log('[Widget] Using default API URL');
-        // Still call initializeApi to ensure wixService is ready
-        // (it won't re-initialize if already done)
+      try {
+        // Initialize Wix and API
         await initializeApi();
+
+        // Fetch data
+        await fetchConfig();
+        await fetchLocations();
+
+        console.log('[Widget] ✅ Initialization complete');
+      } catch (error) {
+        console.error('[Widget] Initialization error:', error);
       }
-
-      // Get authentication status for display
-      const status = wixService.getAuthStatus();
-      setAuthStatus(status);
-      console.log('[Widget] Auth status:', status);
-
-      // Log comprehensive instance information using the new method
-      await wixService.logInstanceInfo();
-
-      // Also log quick access values
-      const instanceId = wixService.getInstanceId();
-      console.log('[Widget] Quick Access - Instance ID:', instanceId);
-
-      // Check for global Wix object and window.Wix.Utils.getInstanceId()
-      if (typeof window !== 'undefined' && (window as any).Wix) {
-        console.log('[Widget] Global Wix object exists:', Object.keys((window as any).Wix));
-        if ((window as any).Wix.Utils) {
-          console.log('[Widget] Wix.Utils exists:', Object.keys((window as any).Wix.Utils));
-
-          // Try to call getInstanceId if it exists
-          if (typeof (window as any).Wix.Utils.getInstanceId === 'function') {
-            try {
-              const wixInstanceId = (window as any).Wix.Utils.getInstanceId();
-              console.log('[Widget] window.Wix.Utils.getInstanceId():', wixInstanceId);
-            } catch (err) {
-              console.log('[Widget] Error calling Wix.Utils.getInstanceId():', err);
-            }
-          } else {
-            console.log('[Widget] Wix.Utils.getInstanceId is not a function');
-          }
-        } else {
-          console.log('[Widget] Wix.Utils does not exist');
-        }
-      } else {
-        console.log('[Widget] Global Wix object not found');
-      }
-
-      console.log('[Widget] ========================================');
-      console.log('[Widget] Fetching config and locations...');
-      console.log('[Widget] ========================================');
-
-      // Fetch config and locations after Wix is initialized
-      await fetchConfig();
-      await fetchLocations();
-
-      console.log('[Widget] ========================================');
-      console.log('[Widget] Widget initialization complete');
-      console.log('[Widget] ========================================');
-
-      // Note: In Wix environment, configuration updates come through
-      // the custom element's attributeChangedCallback, not through events
-      console.log('[Widget] Config updates will be handled by the custom element.');
     };
 
     initializeWidget();
