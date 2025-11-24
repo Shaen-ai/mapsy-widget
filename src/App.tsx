@@ -55,6 +55,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     console.log('[Widget] Instance ID:', instanceId);
     console.log('[Widget] Instance Token:', instanceToken ? `${instanceToken.substring(0, 20)}...` : 'Not available');
     console.log('[Widget] Decoded Instance Data:', decodedInstance);
+    console.log('window.Wix.Utils.getInstanceId', window.Wix.Utils.getInstanceId());
 
     // Also check for global Wix object
     if (typeof window !== 'undefined' && (window as any).Wix) {
