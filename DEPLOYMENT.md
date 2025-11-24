@@ -1,20 +1,28 @@
 # Mapsy Widget Deployment Guide
 
-## Current Version: 1.0.52
+## Current Version: 1.0.54
 
 This guide ensures the latest version with Wix SDK integration is properly deployed.
 
-## What's New in 1.0.52
+## What's New in 1.0.54
+
+✅ **Graceful Error Handling**
+- Falls back to regular fetch when `site.auth()` fails
+- Prevents double initialization of wixService
+- Works both on Wix sites and standalone (non-Wix) environments
+- Comprehensive error logging
 
 ✅ **Wix SDK Integration with @wix/site**
-- Uses `site.auth()` for proper authentication
-- Automatic instance token retrieval
+- Uses `site.auth()` for proper authentication when available
+- Automatic instance token retrieval on published Wix sites
 - Comprehensive instance logging
 
 ✅ **Enhanced API Requests**
-- Uses `wixClient.fetchWithAuth()` as recommended by Wix
+- Uses `wixClient.fetchWithAuth()` when on Wix with auth
+- Falls back to regular authenticated fetch with manual token
+- Falls back to unauthenticated fetch if no token available
 - Sends instance information in custom headers
-- Full authentication logging for debugging
+- Full request logging for debugging
 
 ✅ **Instance Information**
 - Instance ID detection and logging
@@ -24,13 +32,13 @@ This guide ensures the latest version with Wix SDK integration is properly deplo
 
 ## Pre-Deployment Checklist
 
-- [x] Version bumped to 1.0.52
+- [x] Version bumped to 1.0.54
 - [x] All changes committed to git
 - [x] Build completed successfully
 - [x] dist/ folder contains:
   - mapsy-widget.js (loader)
   - mapsy-widget.min.js (widget)
-  - widget-manifest.json (version: 1.0.52)
+  - widget-manifest.json (version: 1.0.54)
   - style.css
 
 ## Deployment Steps
@@ -57,7 +65,7 @@ ls -lh dist/
 cat dist/widget-manifest.json
 ```
 
-Should show version: 1.0.52
+Should show version: 1.0.54
 
 ### Step 3: Deploy to Production Server
 
@@ -116,9 +124,12 @@ This will:
 
 ### Step 5: Verify Instance Detection
 
+#### On a Published Wix Site (with authentication):
+
 In the browser console, you should see:
 
 ```
+[WixService] ✅ site.auth() succeeded
 [WixService] Instance Information Summary
 [WixService] ========================================
 [WixService] Instance ID: <actual-instance-id>
@@ -143,6 +154,33 @@ And when API requests are made:
 [API] Status: 200 OK
 ```
 
+#### In Wix Editor Preview or Standalone (without authentication):
+
+```
+[WixService] ⚠️ site.auth() failed, will try without auth
+[WixService] Instance Information Summary
+[WixService] ========================================
+[WixService] Instance ID: Not available
+[WixService] Has Instance Token: false
+[WixService] Has Wix Client: true
+```
+
+And when API requests are made:
+
+```
+[API] ========================================
+[API] Using regular fetch without authentication
+[API] ========================================
+[API] URL: https://mapsy-api.nextechspires.com/api/locations
+[API] Method: GET
+[API] ⚠️ No instance token - request will be unauthenticated
+[API] This is normal if not running on a published Wix site
+[API] Making request...
+[API] ========================================
+[API] ✅ Request completed
+[API] Status: 200 OK
+```
+
 ## Verification in Browser Network Tab
 
 1. Open Developer Tools (F12)
@@ -158,20 +196,38 @@ And when API requests are made:
 
 ## Troubleshooting
 
+### ~~Error: "Failed to resolve auth token"~~ (FIXED in 1.0.54)
+✅ This error has been fixed. The widget now gracefully falls back to regular fetch when `site.auth()` is not available.
+
 ### No API requests visible in Network tab?
-- Check if wixService initialized properly (look for logs)
-- Verify `site.auth()` is working (check for auth-related logs)
-- Make sure the widget is running on a Wix site (not localhost)
+- **Check console logs** - Look for `[API]` and `[LocationService]` logs
+- **Verify initialization** - Look for `[WixService] Initialization completed` log
+- **Check for errors** - Look for any red error messages in console
+- **CORS issues** - Make sure your backend allows requests from your domain
 
 ### Instance ID showing as "Not available"?
-- This is expected in Wix Editor Preview mode
-- Deploy to a published Wix site to get real instance tokens
-- Check for this log: `[WixService] ⚠️ No instance token available from SDK`
+✅ **This is normal and expected in these scenarios:**
+- Wix Editor Preview mode (before publishing)
+- Testing locally (not on Wix)
+- Standalone deployment (not embedded in Wix)
 
-### API requests failing?
-- Check backend CORS settings
-- Verify API URL is correct in the logs
-- Look for error messages in the console
+The widget will still work! It will just make unauthenticated requests to your API.
+
+**To get instance ID:**
+- Publish your Wix site (not just preview)
+- View the published site (not in editor)
+- Instance ID should appear in console logs
+
+### API requests returning 401 Unauthorized?
+- **In Wix Editor Preview:** This is expected - no auth token available
+- **On published Wix site:** Check if `site.auth()` succeeded in console
+- **Standalone:** Your backend should allow unauthenticated requests or implement fallback logic
+
+### Widget not loading at all?
+- Check browser console for errors
+- Verify all files are uploaded correctly
+- Clear browser cache
+- Check that script URL is correct
 
 ## Cache Clearing
 
@@ -211,10 +267,12 @@ If you encounter issues:
 1. Check the browser console for detailed logs
 2. Look for `[WixService]`, `[API]`, and `[Widget]` log entries
 3. Verify all files are uploaded correctly
-4. Ensure version 1.0.52 is showing in the logs
+4. Ensure version 1.0.54 is showing in the logs
 
 ## Version History
 
+- **1.0.54** - Fixed "Failed to resolve auth token" error, added graceful fallback, prevents double initialization
+- **1.0.53** - Improved error handling
 - **1.0.52** - Wix SDK integration with @wix/site, site.auth(), comprehensive logging
 - **1.0.51** - Previous version
 - **1.0.50** - Previous version
@@ -222,5 +280,5 @@ If you encounter issues:
 ---
 
 **Last Updated:** November 24, 2025
-**Current Version:** 1.0.52
+**Current Version:** 1.0.54
 **Build Time:** Check `dist/widget-manifest.json` for exact timestamp
