@@ -4,7 +4,7 @@ import ListView from './components/ListView';
 import { Location } from './types/location';
 import { locationService, widgetConfigService, initializeApi } from './services/api';
 import wixService from './services/wixService';
-import { FiMap, FiList, FiAlertTriangle } from 'react-icons/fi';
+import { FiMap, FiList } from 'react-icons/fi';
 
 interface WidgetConfig {
   defaultView: 'map' | 'list';
@@ -46,6 +46,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     const status = wixService.getAuthStatus();
     setAuthStatus(status);
     console.log('[Widget] Auth status:', status);
+    console.log((window as any).Wix.Utils.getInstanceId(), 8888888888888);
 
     fetchConfig();
     fetchLocations();
@@ -109,30 +110,6 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Authentication Status Warning Banner */}
-      {authStatus && authStatus.isPreview && !authStatus.hasAuth && (
-        <div className="bg-yellow-50 border-b-2 border-yellow-400">
-          <div className="px-4 py-3 flex items-start gap-3">
-            <FiAlertTriangle className="text-yellow-600 mt-0.5 flex-shrink-0" size={20} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-yellow-800">
-                Wix Editor Preview Mode
-              </p>
-              <p className="text-xs text-yellow-700 mt-1">
-                Instance authentication is not available in editor preview. To test multi-tenancy:
-              </p>
-              <ol className="text-xs text-yellow-700 mt-1 ml-4 list-decimal space-y-0.5">
-                <li>Publish your Wix site</li>
-                <li>Visit the published site URL (not the editor)</li>
-                <li>Authentication will work automatically on the live site</li>
-              </ol>
-              <p className="text-xs text-yellow-600 mt-2 font-medium">
-                Currently showing all locations from database (no instance filtering)
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {config.showHeader && (
         <div className="bg-white shadow-sm border-b border-gray-200">
