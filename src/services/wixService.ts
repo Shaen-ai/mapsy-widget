@@ -5,7 +5,7 @@ import { site } from '@wix/site';
 class WixService {
   private static instance: WixService;
   private wixClient: any = null;
-  private applicationId: string = 'YOUR_APP_ID'; // TODO: Replace with actual App ID
+  private applicationId: string = '0d076a26-ce6d-4d16-83c5-126cdf640aa4';
 
   private constructor() {}
 
