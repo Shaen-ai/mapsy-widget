@@ -14,6 +14,8 @@ class WixService {
   private instanceToken: string | null = null;
   private compId: string | null = null;
   private decodedInstance: WixInstanceData | null = null;
+  private isInitializing: boolean = false;
+  private initializationComplete: boolean = false;
 
   private constructor() {}
 
@@ -72,6 +74,28 @@ class WixService {
   }
 
   async initialize(compId?: string, instanceTokenOverride?: string): Promise<void> {
+    // Prevent double initialization
+    if (this.initializationComplete) {
+      console.log('[WixService] Already initialized, skipping...');
+      return;
+    }
+
+    if (this.isInitializing) {
+      console.log('[WixService] Initialization already in progress, waiting...');
+      // Wait for initialization to complete
+      await new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+          if (this.initializationComplete || !this.isInitializing) {
+            clearInterval(checkInterval);
+            resolve(undefined);
+          }
+        }, 100);
+      });
+      return;
+    }
+
+    this.isInitializing = true;
+
     try {
       console.log('[WixService] ========================================');
       console.log('[WixService] Initializing for Site Widget (Custom Element)...');
@@ -96,12 +120,23 @@ class WixService {
 
       try {
         // Create Wix client using site.auth() as recommended by Wix
+        console.log('[WixService] Attempting to create client with site.auth()...');
+
+        let authContext;
+        try {
+          authContext = site.auth();
+          console.log('[WixService] ✅ site.auth() succeeded');
+        } catch (authError) {
+          console.warn('[WixService] ⚠️ site.auth() failed, will try without auth:', authError);
+          authContext = undefined;
+        }
+
         this.wixClient = createClient({
-          auth: site.auth(),
+          auth: authContext,
           modules: {},
         });
 
-        console.log('[WixService] ✅ Wix client created with site.auth()');
+        console.log('[WixService] ✅ Wix client created');
         console.log('[WixService] Client object:', this.wixClient);
         console.log('[WixService] Client keys:', Object.keys(this.wixClient || {}));
 
@@ -217,6 +252,10 @@ class WixService {
     } catch (error) {
       console.error('[WixService] Failed to initialize:', error);
       console.error('[WixService] Error details:', error instanceof Error ? error.message : String(error));
+    } finally {
+      this.isInitializing = false;
+      this.initializationComplete = true;
+      console.log('[WixService] Initialization completed');
     }
   }
 

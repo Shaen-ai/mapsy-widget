@@ -43,8 +43,8 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
   console.log('[API] Vendor Product ID (Plan):', vendorProductId || 'NO');
   console.log('[API] Wix client available:', wixClient ? 'YES' : 'NO');
 
-  // Try to use Wix SDK's fetchWithAuth if available
-  if (wixClient && typeof wixClient.fetchWithAuth === 'function') {
+  // Try to use Wix SDK's fetchWithAuth if available and has instance token
+  if (wixClient && typeof wixClient.fetchWithAuth === 'function' && instanceToken) {
     console.log('[API] ========================================');
     console.log('[API] Using Wix SDK fetchWithAuth');
     console.log('[API] ========================================');
@@ -88,15 +88,20 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
       return response;
     } catch (error) {
       console.error('[API] ========================================');
-      console.error('[API] ❌ Wix fetchWithAuth failed');
-      console.error('[API] Error:', error);
+      console.error('[API] ❌ Wix fetchWithAuth failed:', error);
+      console.error('[API] Error message:', error instanceof Error ? error.message : String(error));
+      console.error('[API] Falling back to manual token injection');
       console.error('[API] ========================================');
-      throw error;
+      // Fall through to manual token injection below
     }
   }
 
-  // Fallback to manual token injection
-  console.log('[API] Using manual token injection');
+  // Fallback to manual token injection or unauthenticated request
+  console.log('[API] ========================================');
+  console.log('[API] Using regular fetch', instanceToken ? 'with manual token' : 'without authentication');
+  console.log('[API] ========================================');
+  console.log('[API] URL:', url);
+  console.log('[API] Method:', options?.method || 'GET');
 
   const headers = new Headers(options?.headers);
   headers.set('Content-Type', 'application/json');
@@ -107,6 +112,7 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
     console.log('[API] Token preview:', instanceToken.substring(0, 20) + '...');
   } else {
     console.warn('[API] ⚠️ No instance token - request will be unauthenticated');
+    console.warn('[API] This is normal if not running on a published Wix site');
   }
 
   if (compId) {
@@ -117,13 +123,18 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
   // Add decoded instance data as headers for easier backend access
   if (instanceId) {
     headers.set('X-Wix-Instance-Id', instanceId);
+    console.log('[API] ✅ Added X-Wix-Instance-Id header:', instanceId);
   }
   if (appDefId) {
     headers.set('X-Wix-App-Def-Id', appDefId);
+    console.log('[API] ✅ Added X-Wix-App-Def-Id header:', appDefId);
   }
   if (vendorProductId) {
     headers.set('X-Wix-Vendor-Product-Id', vendorProductId);
+    console.log('[API] ✅ Added X-Wix-Vendor-Product-Id header:', vendorProductId);
   }
+
+  console.log('[API] Making request...');
 
   try {
     const response = await fetch(url, {
@@ -131,10 +142,16 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
       headers,
     });
 
-    console.log('[API] ✅ Request completed with status:', response.status);
+    console.log('[API] ========================================');
+    console.log('[API] ✅ Request completed');
+    console.log('[API] Status:', response.status, response.statusText);
+    console.log('[API] ========================================');
     return response;
   } catch (error) {
-    console.error('[API] ❌ Request failed:', error);
+    console.error('[API] ========================================');
+    console.error('[API] ❌ Request failed');
+    console.error('[API] Error:', error);
+    console.error('[API] ========================================');
     throw error;
   }
 }
