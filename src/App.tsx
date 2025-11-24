@@ -46,7 +46,39 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     const status = wixService.getAuthStatus();
     setAuthStatus(status);
     console.log('[Widget] Auth status:', status);
-    console.log((window as any).Wix.Utils.getInstanceId(), 8888888888888);
+
+    // Log instance information
+    const instanceId = wixService.getInstanceId();
+    const instanceToken = wixService.getInstanceToken();
+    const decodedInstance = wixService.getDecodedInstance();
+
+    console.log('[Widget] Instance ID:', instanceId);
+    console.log('[Widget] Instance Token:', instanceToken ? `${instanceToken.substring(0, 20)}...` : 'Not available');
+    console.log('[Widget] Decoded Instance Data:', decodedInstance);
+
+    // Also check for global Wix object
+    if (typeof window !== 'undefined' && (window as any).Wix) {
+      console.log('[Widget] Global Wix object exists:', Object.keys((window as any).Wix));
+      if ((window as any).Wix.Utils) {
+        console.log('[Widget] Wix.Utils exists:', Object.keys((window as any).Wix.Utils));
+
+        // Try to call getInstanceId if it exists
+        if (typeof (window as any).Wix.Utils.getInstanceId === 'function') {
+          try {
+            const wixInstanceId = (window as any).Wix.Utils.getInstanceId();
+            console.log('[Widget] Wix.Utils.getInstanceId():', wixInstanceId);
+          } catch (err) {
+            console.log('[Widget] Error calling Wix.Utils.getInstanceId():', err);
+          }
+        } else {
+          console.log('[Widget] Wix.Utils.getInstanceId is not a function');
+        }
+      } else {
+        console.log('[Widget] Wix.Utils does not exist');
+      }
+    } else {
+      console.log('[Widget] Global Wix object not found');
+    }
 
     fetchConfig();
     fetchLocations();
