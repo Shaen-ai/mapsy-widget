@@ -37,56 +37,57 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   });
 
   useEffect(() => {
-    // Initialize API with provided URL if any
-    if (apiUrl) {
-      initializeApi(apiUrl);
-    }
+    const initializeWidget = async () => {
+      // Initialize API with provided URL if any
+      if (apiUrl) {
+        initializeApi(apiUrl);
+      }
 
-    // Get authentication status for display
-    const status = wixService.getAuthStatus();
-    setAuthStatus(status);
-    console.log('[Widget] Auth status:', status);
+      // Get authentication status for display
+      const status = wixService.getAuthStatus();
+      setAuthStatus(status);
+      console.log('[Widget] Auth status:', status);
 
-    // Log instance information
-    const instanceId = wixService.getInstanceId();
-    const instanceToken = wixService.getInstanceToken();
-    const decodedInstance = wixService.getDecodedInstance();
+      // Log comprehensive instance information using the new method
+      await wixService.logInstanceInfo();
 
-    console.log('[Widget] Instance ID:', instanceId);
-    console.log('[Widget] Instance Token:', instanceToken ? `${instanceToken.substring(0, 20)}...` : 'Not available');
-    console.log('[Widget] Decoded Instance Data:', decodedInstance);
-    console.log('window.Wix.Utils.getInstanceId', window.Wix.Utils.getInstanceId());
+      // Also log quick access values
+      const instanceId = wixService.getInstanceId();
+      console.log('[Widget] Quick Access - Instance ID:', instanceId);
 
-    // Also check for global Wix object
-    if (typeof window !== 'undefined' && (window as any).Wix) {
-      console.log('[Widget] Global Wix object exists:', Object.keys((window as any).Wix));
-      if ((window as any).Wix.Utils) {
-        console.log('[Widget] Wix.Utils exists:', Object.keys((window as any).Wix.Utils));
+      // Check for global Wix object and window.Wix.Utils.getInstanceId()
+      if (typeof window !== 'undefined' && (window as any).Wix) {
+        console.log('[Widget] Global Wix object exists:', Object.keys((window as any).Wix));
+        if ((window as any).Wix.Utils) {
+          console.log('[Widget] Wix.Utils exists:', Object.keys((window as any).Wix.Utils));
 
-        // Try to call getInstanceId if it exists
-        if (typeof (window as any).Wix.Utils.getInstanceId === 'function') {
-          try {
-            const wixInstanceId = (window as any).Wix.Utils.getInstanceId();
-            console.log('[Widget] Wix.Utils.getInstanceId():', wixInstanceId);
-          } catch (err) {
-            console.log('[Widget] Error calling Wix.Utils.getInstanceId():', err);
+          // Try to call getInstanceId if it exists
+          if (typeof (window as any).Wix.Utils.getInstanceId === 'function') {
+            try {
+              const wixInstanceId = (window as any).Wix.Utils.getInstanceId();
+              console.log('[Widget] window.Wix.Utils.getInstanceId():', wixInstanceId);
+            } catch (err) {
+              console.log('[Widget] Error calling Wix.Utils.getInstanceId():', err);
+            }
+          } else {
+            console.log('[Widget] Wix.Utils.getInstanceId is not a function');
           }
         } else {
-          console.log('[Widget] Wix.Utils.getInstanceId is not a function');
+          console.log('[Widget] Wix.Utils does not exist');
         }
       } else {
-        console.log('[Widget] Wix.Utils does not exist');
+        console.log('[Widget] Global Wix object not found');
       }
-    } else {
-      console.log('[Widget] Global Wix object not found');
-    }
 
-    fetchConfig();
-    fetchLocations();
+      fetchConfig();
+      fetchLocations();
 
-    // Note: In Wix environment, configuration updates come through
-    // the custom element's attributeChangedCallback, not through events
-    console.log('[Widget] App mounted. Config updates will be handled by the custom element.');
+      // Note: In Wix environment, configuration updates come through
+      // the custom element's attributeChangedCallback, not through events
+      console.log('[Widget] App mounted. Config updates will be handled by the custom element.');
+    };
+
+    initializeWidget();
   }, [apiUrl]);
 
   const fetchConfig = async () => {

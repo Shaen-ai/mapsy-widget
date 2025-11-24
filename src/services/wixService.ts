@@ -1,4 +1,5 @@
 import { createClient } from '@wix/sdk';
+import { site } from '@wix/site';
 
 // Decoded Wix instance data
 interface WixInstanceData {
@@ -94,13 +95,13 @@ class WixService {
       console.log('[WixService] Creating Wix SDK client...');
 
       try {
-        // Create Wix client for Custom Element
-        // When SDK modules are enabled, Wix injects the authentication context
+        // Create Wix client using site.auth() as recommended by Wix
         this.wixClient = createClient({
+          auth: site.auth(),
           modules: {},
         });
 
-        console.log('[WixService] ✅ Wix client created');
+        console.log('[WixService] ✅ Wix client created with site.auth()');
         console.log('[WixService] Client object:', this.wixClient);
         console.log('[WixService] Client keys:', Object.keys(this.wixClient || {}));
 
@@ -194,6 +195,16 @@ class WixService {
           console.warn('[WixService] ⚠️ No instance token available from SDK');
           // Fallback to manual retrieval
           await this.fallbackTokenRetrieval();
+        }
+
+        // Try to get instance from site context
+        try {
+          const siteContext = await this.getSiteContext();
+          if (siteContext) {
+            console.log('[WixService] Site context:', siteContext);
+          }
+        } catch (err) {
+          console.log('[WixService] Could not get site context:', err);
         }
 
       } catch (sdkError) {
@@ -371,6 +382,61 @@ class WixService {
       isPreview: false,
       message: 'Authenticated with Wix instance'
     };
+  }
+
+  // Get site context information using the Wix client
+  async getSiteContext(): Promise<any> {
+    if (!this.wixClient) {
+      return null;
+    }
+
+    try {
+      // Try to get auth headers which contain the instance token
+      if (this.wixClient.auth && typeof this.wixClient.auth.getAuthHeaders === 'function') {
+        const headers = await this.wixClient.auth.getAuthHeaders();
+        return {
+          headers,
+          authAvailable: !!headers,
+        };
+      }
+
+      return null;
+    } catch (err) {
+      console.error('[WixService] Error getting site context:', err);
+      return null;
+    }
+  }
+
+  // Use fetchWithAuth to make an authenticated request and log instance info
+  async logInstanceInfo(): Promise<void> {
+    console.log('[WixService] ========================================');
+    console.log('[WixService] Instance Information Summary');
+    console.log('[WixService] ========================================');
+    console.log('[WixService] Instance ID:', this.getInstanceId() || 'Not available');
+    console.log('[WixService] App Def ID:', this.getAppDefId() || 'Not available');
+    console.log('[WixService] Vendor Product ID:', this.getVendorProductId() || 'Not available');
+    console.log('[WixService] Has Instance Token:', !!this.instanceToken);
+    console.log('[WixService] Has Wix Client:', !!this.wixClient);
+    console.log('[WixService] Comp ID:', this.compId || 'Not available');
+
+    if (this.wixClient) {
+      console.log('[WixService] Wix Client Keys:', Object.keys(this.wixClient));
+
+      if (this.wixClient.auth) {
+        console.log('[WixService] Auth Keys:', Object.keys(this.wixClient.auth));
+
+        // Try to get auth headers
+        try {
+          if (typeof this.wixClient.auth.getAuthHeaders === 'function') {
+            const authHeaders = await this.wixClient.auth.getAuthHeaders();
+            console.log('[WixService] Auth Headers:', authHeaders);
+          }
+        } catch (err) {
+          console.log('[WixService] Could not get auth headers:', err);
+        }
+      }
+    }
+    console.log('[WixService] ========================================');
   }
 
   // Use Wix SDK's fetchWithAuth if available
