@@ -38,9 +38,20 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
   useEffect(() => {
     const initializeWidget = async () => {
-      // Initialize API with provided URL if any
+      console.log('[Widget] ========================================');
+      console.log('[Widget] Starting widget initialization...');
+      console.log('[Widget] ========================================');
+
+      // Note: WixService is already initialized by MapsyWidgetElement.connectedCallback
+      // We just need to update the API URL if provided
       if (apiUrl) {
-        initializeApi(apiUrl);
+        console.log('[Widget] Initializing API with custom URL:', apiUrl);
+        await initializeApi(apiUrl);
+      } else {
+        console.log('[Widget] Using default API URL');
+        // Still call initializeApi to ensure wixService is ready
+        // (it won't re-initialize if already done)
+        await initializeApi();
       }
 
       // Get authentication status for display
@@ -79,12 +90,21 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
         console.log('[Widget] Global Wix object not found');
       }
 
-      fetchConfig();
-      fetchLocations();
+      console.log('[Widget] ========================================');
+      console.log('[Widget] Fetching config and locations...');
+      console.log('[Widget] ========================================');
+
+      // Fetch config and locations after Wix is initialized
+      await fetchConfig();
+      await fetchLocations();
+
+      console.log('[Widget] ========================================');
+      console.log('[Widget] Widget initialization complete');
+      console.log('[Widget] ========================================');
 
       // Note: In Wix environment, configuration updates come through
       // the custom element's attributeChangedCallback, not through events
-      console.log('[Widget] App mounted. Config updates will be handled by the custom element.');
+      console.log('[Widget] Config updates will be handled by the custom element.');
     };
 
     initializeWidget();

@@ -6,13 +6,15 @@ const PRODUCTION_API_URL = 'https://mapsy-api.nextechspires.com/api';
 
 let apiBaseUrl = PRODUCTION_API_URL;
 
-export const initializeApi = (apiUrl?: string) => {
+export const initializeApi = async (apiUrl?: string) => {
   // Always use production URL unless explicitly overridden
   apiBaseUrl = apiUrl || PRODUCTION_API_URL;
   console.log('[API] Initialized with base URL:', apiBaseUrl);
 
-  // Here
-  wixService.initialize();
+  // Initialize Wix service and wait for it to complete
+  console.log('[API] Initializing Wix service...');
+  await wixService.initialize();
+  console.log('[API] ✅ Wix service initialized');
 };
 
 // Initialize with production URL
@@ -43,7 +45,11 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
 
   // Try to use Wix SDK's fetchWithAuth if available
   if (wixClient && typeof wixClient.fetchWithAuth === 'function') {
-    console.log('[API] Using Wix SDK fetchWithAuth (automatically authenticated)');
+    console.log('[API] ========================================');
+    console.log('[API] Using Wix SDK fetchWithAuth');
+    console.log('[API] ========================================');
+    console.log('[API] URL:', url);
+    console.log('[API] Method:', options?.method || 'GET');
 
     const headers = new Headers(options?.headers);
     headers.set('Content-Type', 'application/json');
@@ -56,13 +62,18 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
     // Add decoded instance data as headers for easier backend access
     if (instanceId) {
       headers.set('X-Wix-Instance-Id', instanceId);
+      console.log('[API] ✅ Added X-Wix-Instance-Id header:', instanceId);
     }
     if (appDefId) {
       headers.set('X-Wix-App-Def-Id', appDefId);
+      console.log('[API] ✅ Added X-Wix-App-Def-Id header:', appDefId);
     }
     if (vendorProductId) {
       headers.set('X-Wix-Vendor-Product-Id', vendorProductId);
+      console.log('[API] ✅ Added X-Wix-Vendor-Product-Id header:', vendorProductId);
     }
+
+    console.log('[API] Making authenticated request...');
 
     try {
       const response = await wixClient.fetchWithAuth(url, {
@@ -70,10 +81,16 @@ async function fetchWithAuth(endpoint: string, options?: RequestInit): Promise<R
         headers,
       });
 
-      console.log('[API] ✅ Request completed with status:', response.status);
+      console.log('[API] ========================================');
+      console.log('[API] ✅ Request completed');
+      console.log('[API] Status:', response.status, response.statusText);
+      console.log('[API] ========================================');
       return response;
     } catch (error) {
-      console.error('[API] ❌ Wix fetchWithAuth failed:', error);
+      console.error('[API] ========================================');
+      console.error('[API] ❌ Wix fetchWithAuth failed');
+      console.error('[API] Error:', error);
+      console.error('[API] ========================================');
       throw error;
     }
   }
