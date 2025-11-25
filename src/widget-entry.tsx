@@ -69,21 +69,10 @@ class MapsyWidget {
   }
 
   static autoInit() {
-    console.log('[MapsyWidget] Auto-initializing...');
-    // Custom element <mapsy-widget> automatically initializes itself via connectedCallback
-    // This function is here for backward compatibility
-
-    // Check if there are any mapsy-widget elements
-    const widgets = document.querySelectorAll('mapsy-widget');
-    console.log(`[MapsyWidget] Found ${widgets.length} <mapsy-widget> elements`);
-
-    if (widgets.length === 0) {
-      console.log('[MapsyWidget] No <mapsy-widget> elements found. Custom elements will auto-initialize when added to DOM.');
-    }
+    // Custom element auto-initializes via connectedCallback
   }
 
   private static createWidget(element: HTMLElement, config?: any) {
-    console.log('[MapsyWidget] Creating widget on element:', element);
 
     // If element is already a mapsy-widget, just update its config
     if (element.tagName.toLowerCase() === 'mapsy-widget') {
@@ -117,8 +106,6 @@ class MapsyWidget {
     // Clear element and add widget
     element.innerHTML = '';
     element.appendChild(widget);
-
-    console.log('[MapsyWidget] Widget created with custom element');
   }
 
   static getVersion() {

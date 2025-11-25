@@ -4,11 +4,10 @@ import App from './App';
 
 /**
  * Custom Element for Wix integration
- * This wraps the React widget as a Web Component that Wix can interact with
  */
 class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
-  public _initialized: boolean = false; // Public so we can check from outside
+  public _initialized: boolean = false;
   private config = {
     defaultView: 'map' as 'map' | 'list',
     showHeader: false,
@@ -20,90 +19,48 @@ class MapsyWidgetElement extends HTMLElement {
 
   constructor() {
     super();
-    console.log('[MapsyWidgetElement] ========================================');
-    console.log('[MapsyWidgetElement] CONSTRUCTOR CALLED!');
-    console.log('[MapsyWidgetElement] ========================================');
     this.attachShadow({ mode: 'open' });
   }
 
-  // Specify which attributes to observe for changes
   static get observedAttributes() {
     return [
-      'default-view',
-      'defaultview',  // Support both hyphenated and non-hyphenated
-      'show-header',
-      'showheader',
-      'header-title',
-      'headertitle',
-      'map-zoom-level',
-      'mapzoomlevel',
-      'primary-color',
-      'primarycolor',
-      'api-url',
-      'compid',  // Wix component ID (legacy attribute)
-      'comp-id',
-      'config'  // Support full config as JSON string
+      'default-view', 'defaultview',
+      'show-header', 'showheader',
+      'header-title', 'headertitle',
+      'map-zoom-level', 'mapzoomlevel',
+      'primary-color', 'primarycolor',
+      'api-url', 'compid', 'comp-id', 'config'
     ];
   }
 
   async connectedCallback() {
-    console.log('[MapsyWidget] ========================================');
-    console.log('[MapsyWidget] connectedCallback CALLED!');
-    console.log('[MapsyWidget] ========================================');
-
-    // Prevent double initialization
-    if (this._initialized) {
-      console.log('[MapsyWidget] Already initialized, skipping connectedCallback');
-      return;
-    }
+    if (this._initialized) return;
 
     try {
-      console.log('[MapsyWidget] === connectedCallback START ===');
-      console.log('[MapsyWidget] Connected to DOM');
-      console.log('[MapsyWidget] All attributes:', this.getAttributeNames());
-      console.log('[MapsyWidget] Current URL:', window.location.href);
-      console.log('[MapsyWidget] URL search params:', window.location.search);
-
-      // Read initial attributes
       this.updateConfigFromAttributes();
-
-      // Mount React app
       this.mountReactApp();
-
-      // Mark as initialized
       this._initialized = true;
-      console.log('[MapsyWidget] === connectedCallback COMPLETE ===');
-
     } catch (error) {
-      console.error('[MapsyWidget] ERROR in connectedCallback:', error);
-      console.error('[MapsyWidget] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      // Still try to mount the app even if there's an error
+      console.error('[Widget] Mount error:', error);
       try {
         this.mountReactApp();
         this._initialized = true;
       } catch (mountError) {
-        console.error('[MapsyWidget] Failed to mount React app:', mountError);
+        console.error('[Widget] Failed to mount:', mountError);
       }
     }
   }
 
   disconnectedCallback() {
-    console.log('MapsyWidget disconnected from DOM');
-
-    // Cleanup React app
     if (this.root) {
       this.root.unmount();
       this.root = null;
     }
   }
 
-  // Called when observed attributes change
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    console.log(`[MapsyWidgetElement] Attribute ${name} changed from ${oldValue} to ${newValue}`);
-
     if (oldValue === newValue || newValue === null) return;
 
-    // Update config based on attribute changes
     switch (name) {
       case 'default-view':
       case 'defaultview':
@@ -130,25 +87,18 @@ class MapsyWidgetElement extends HTMLElement {
         break;
       case 'compid':
       case 'comp-id':
-        // Store compId if needed for future use
-        console.log('[MapsyWidgetElement] CompId attribute:', newValue);
-        // Don't re-render for compId changes
         return;
       case 'config':
-        // Handle full config as JSON
         try {
           const parsedConfig = JSON.parse(newValue);
           this.config = { ...this.config, ...parsedConfig };
-          console.log('[MapsyWidgetElement] Config updated from JSON:', this.config);
         } catch (error) {
-          console.error('[MapsyWidgetElement] Error parsing config JSON:', error);
+          console.error('[Widget] Config parse error:', error);
         }
         break;
     }
 
-    // Re-render React app with new config
     if (this.root) {
-      console.log('[MapsyWidgetElement] Re-rendering with updated config');
       this.mountReactApp();
     }
   }
@@ -218,18 +168,11 @@ class MapsyWidgetElement extends HTMLElement {
     );
   }
 
-  // Public method for Wix to update properties
   public setProp(property: string, value: any) {
-    console.log(`setProp called: ${property} = ${value}`);
-
-    // Convert camelCase to kebab-case
     const attrName = property.replace(/([A-Z])/g, '-$1').toLowerCase();
-
-    // Set attribute (will trigger attributeChangedCallback)
     this.setAttribute(attrName, String(value));
   }
 
-  // Public method to get current config
   public getConfig() {
     return { ...this.config };
   }
@@ -237,43 +180,16 @@ class MapsyWidgetElement extends HTMLElement {
 
 // Register the custom element
 if (!customElements.get('mapsy-widget')) {
-  console.log('[MapsyWidgetElement] Registering custom element...');
   customElements.define('mapsy-widget', MapsyWidgetElement);
-  console.log('[MapsyWidgetElement] ✅ Custom element registered');
 
-  // IMPORTANT: Manually upgrade any existing elements
-  // When custom element is defined AFTER elements already exist in DOM,
-  // browser automatically upgrades them, but we need to ensure connectedCallback runs
+  // Manually upgrade any existing elements
   setTimeout(() => {
-    const existingWidgets = document.querySelectorAll('mapsy-widget');
-    console.log(`[MapsyWidgetElement] Found ${existingWidgets.length} existing widget elements`);
-
-    existingWidgets.forEach((widget, index) => {
-      console.log(`[MapsyWidgetElement] Checking widget ${index + 1}:`, {
-        isConnected: widget.isConnected,
-        isInstance: widget instanceof MapsyWidgetElement,
-        hasRoot: !!(widget as any).root,
-        isInitialized: !!(widget as any)._initialized,
-      });
-
-      // If element is upgraded but not initialized, manually call connectedCallback
-      if (widget instanceof MapsyWidgetElement) {
-        const widgetElement = widget as MapsyWidgetElement;
-        if (!widgetElement._initialized) {
-          console.log('[MapsyWidgetElement] Manually initializing widget', index + 1);
-          widgetElement.connectedCallback().catch(err => {
-            console.error('[MapsyWidgetElement] Error during manual initialization:', err);
-          });
-        } else {
-          console.log('[MapsyWidgetElement] Widget', index + 1, 'already initialized');
-        }
-      } else {
-        console.warn('[MapsyWidgetElement] Widget', index + 1, 'not upgraded to MapsyWidgetElement instance!');
+    document.querySelectorAll('mapsy-widget').forEach((widget) => {
+      if (widget instanceof MapsyWidgetElement && !widget._initialized) {
+        widget.connectedCallback().catch(console.error);
       }
     });
-  }, 100); // Increased timeout to give browser time to upgrade
-} else {
-  console.log('[MapsyWidgetElement] Custom element already registered');
+  }, 100);
 }
 
 export default MapsyWidgetElement;
