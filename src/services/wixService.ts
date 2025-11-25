@@ -1,120 +1,122 @@
-import { createClient } from '@wix/sdk';
 import { site } from '@wix/site';
+import { createClient } from '@wix/sdk';
 
-// Simple Wix Service following Wix's exact recommended pattern
+// Application ID for the Wix App
+const APPLICATION_ID = '0d076a26-ce6d-4d16-83c5-126cdf640aa4';
+
+console.log('[WixService] Module loading...');
+console.log('[WixService] APPLICATION_ID:', APPLICATION_ID);
+
+// Create the Wix client at module level (as per Wix documentation)
+let wixClient: ReturnType<typeof createClient> | null = null;
+let accessTokenListener: (() => void) | null = null;
+
+try {
+  console.log('[WixService] Creating Wix client with site.auth() and site.host()...');
+
+  wixClient = createClient({
+    auth: site.auth(),
+    host: site.host({ applicationId: APPLICATION_ID }),
+  });
+
+  console.log('[WixService] ✅ Wix client created successfully');
+  console.log('[WixService] wixClient keys:', Object.keys(wixClient || {}));
+
+  // Get the access token injector (as per Wix documentation)
+  if (wixClient.auth && typeof wixClient.auth.getAccessTokenInjector === 'function') {
+    accessTokenListener = wixClient.auth.getAccessTokenInjector();
+    console.log('[WixService] ✅ Access token injector obtained');
+  } else {
+    console.warn('[WixService] getAccessTokenInjector not available');
+  }
+} catch (error) {
+  console.error('[WixService] ❌ Failed to create Wix client:', error);
+  console.error('[WixService] Error message:', (error as Error)?.message);
+  wixClient = null;
+}
+
 class WixService {
   private static instance: WixService;
-  private wixClient: any = null;
-  private applicationId: string = '0d076a26-ce6d-4d16-83c5-126cdf640aa4';
+  private initialized: boolean = false;
 
   private constructor() {
     console.log('[WixService] Constructor called');
   }
 
   static getInstance(): WixService {
-    console.log('[WixService] getInstance called, instance exists:', !!WixService.instance);
     if (!WixService.instance) {
       WixService.instance = new WixService();
     }
     return WixService.instance;
   }
 
-  // Initialize Wix client exactly as Wix recommends
-  async initialize(appId?: string): Promise<void> {
+  // Initialize the service
+  async initialize(_appId?: string): Promise<void> {
     console.log('[WixService] ========== INITIALIZE START ==========');
-    console.log('[WixService] appId param:', appId);
-    console.log('[WixService] Current applicationId:', this.applicationId);
-    console.log('[WixService] Already initialized:', this.wixClient !== null);
+    console.log('[WixService] wixClient exists:', !!wixClient);
+    console.log('[WixService] accessTokenListener exists:', !!accessTokenListener);
 
-    try {
-      console.log('[WixService] Initializing Wix client...');
-
-      // Use provided appId or default
-      if (appId) {
-        this.applicationId = appId;
-        console.log('[WixService] Updated applicationId to:', this.applicationId);
-      }
-
-      console.log('[WixService] About to call site.auth()...');
-      const auth = site.auth();
-      console.log('[WixService] site.auth() returned:', auth);
-      console.log('[WixService] site.auth() type:', typeof auth);
-
-      console.log('[WixService] About to call site.host()...');
-      const host = site.host({ applicationId: this.applicationId });
-      console.log('[WixService] site.host() returned:', host);
-      console.log('[WixService] site.host() type:', typeof host);
-
-      console.log('[WixService] About to call createClient()...');
-      // Create Wix client exactly as shown in Wix documentation
-      this.wixClient = createClient({
-        auth: auth,
-        host: host,
-      });
-
-      console.log('[WixService] ✅ Wix client created successfully');
-      console.log('[WixService] wixClient:', this.wixClient);
-      console.log('[WixService] wixClient keys:', Object.keys(this.wixClient || {}));
-      console.log('[WixService] Has fetchWithAuth:', typeof this.wixClient?.fetchWithAuth);
-    } catch (error) {
-      console.error('[WixService] ❌ Failed to initialize:', error);
-      console.error('[WixService] Error name:', (error as Error)?.name);
-      console.error('[WixService] Error message:', (error as Error)?.message);
-      console.error('[WixService] Error stack:', (error as Error)?.stack);
-
-      // Create client without auth as fallback
-      console.log('[WixService] Creating fallback client without auth...');
-      this.wixClient = createClient({
-        modules: {},
-      });
-      console.warn('[WixService] Created client without authentication');
-      console.log('[WixService] Fallback wixClient:', this.wixClient);
-    }
-
+    this.initialized = true;
+    console.log('[WixService] ✅ Service initialized');
     console.log('[WixService] ========== INITIALIZE END ==========');
   }
 
-  // Make authenticated request to backend - exactly as Wix recommends
+  // Make authenticated request using Wix client's fetchWithAuth
   async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
     console.log('[WixService] ========== FETCH START ==========');
     console.log('[WixService] URL:', url);
-    console.log('[WixService] Options:', JSON.stringify(options, null, 2));
-    console.log('[WixService] wixClient exists:', !!this.wixClient);
-    console.log('[WixService] wixClient.fetchWithAuth exists:', typeof this.wixClient?.fetchWithAuth);
+    console.log('[WixService] Method:', options?.method || 'GET');
+    console.log('[WixService] wixClient exists:', !!wixClient);
 
-    if (!this.wixClient) {
-      console.error('[WixService] ❌ No wixClient - not initialized!');
-      throw new Error('Wix client not initialized. Call initialize() first.');
+    // Try Wix authenticated fetch first
+    if (wixClient && typeof wixClient.fetchWithAuth === 'function') {
+      try {
+        console.log('[WixService] Using wixClient.fetchWithAuth()...');
+        const response = await wixClient.fetchWithAuth(url, options);
+        console.log('[WixService] ✅ Wix fetchWithAuth succeeded');
+        console.log('[WixService] Response status:', response.status);
+        console.log('[WixService] ========== FETCH END ==========');
+        return response;
+      } catch (error) {
+        console.error('[WixService] ❌ Wix fetchWithAuth failed:', (error as Error)?.message);
+        console.log('[WixService] Falling back to direct fetch...');
+      }
+    } else {
+      console.log('[WixService] wixClient.fetchWithAuth not available, using direct fetch');
     }
 
-    console.log('[WixService] Making authenticated request to:', url);
-
+    // Fallback to direct fetch
     try {
-      console.log('[WixService] Calling wixClient.fetchWithAuth()...');
-      // Use Wix's fetchWithAuth - it automatically adds the access token
-      const response = await this.wixClient.fetchWithAuth(url, options);
-      console.log('[WixService] ✅ Request completed');
+      console.log('[WixService] Making direct fetch request...');
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+      });
+
+      console.log('[WixService] ✅ Direct fetch completed');
       console.log('[WixService] Response status:', response.status);
-      console.log('[WixService] Response ok:', response.ok);
-      console.log('[WixService] Response headers:', [...response.headers.entries()]);
       console.log('[WixService] ========== FETCH END ==========');
       return response;
     } catch (error) {
-      console.error('[WixService] ❌ Request failed:', error);
-      console.error('[WixService] Error name:', (error as Error)?.name);
-      console.error('[WixService] Error message:', (error as Error)?.message);
-      console.error('[WixService] Error stack:', (error as Error)?.stack);
+      console.error('[WixService] ❌ Direct fetch failed:', error);
       console.log('[WixService] ========== FETCH END (ERROR) ==========');
       throw error;
     }
   }
 
-  getWixClient(): any {
-    return this.wixClient;
+  isInitialized(): boolean {
+    return this.initialized;
   }
 
-  isInitialized(): boolean {
-    return this.wixClient !== null;
+  getWixClient() {
+    return wixClient;
+  }
+
+  getAccessTokenListener() {
+    return accessTokenListener;
   }
 }
 
