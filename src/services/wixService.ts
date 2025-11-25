@@ -1,47 +1,48 @@
-// API Service - Makes direct fetch calls to backend
-// Note: Wix SDK auth doesn't work for JS-embedded widgets, using direct fetch
+import { site } from '@wix/site';
+import { createClient } from '@wix/sdk';
 
-console.log('[ApiService] Module loading...');
+// App ID from Wix Dev Center
+const APP_ID = '0d076a26-ce6d-4d16-83c5-126cdf640aa4';
 
+// Create Wix client with site authentication (as per Wix docs)
+console.log('[Wix] Creating client...');
+
+const wixClient = createClient({
+  auth: site.auth(),
+  host: site.host({ applicationId: APP_ID }),
+});
+
+console.log('[Wix] ✅ Client created');
+
+// Export fetch function that uses Wix authentication
+export const fetchWithAuth = async (url: string, options?: RequestInit): Promise<Response> => {
+  console.log('[Wix] Fetching:', url);
+
+  const response = await wixClient.fetchWithAuth(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+
+  console.log('[Wix] Response:', response.status, response.ok ? '✅' : '❌');
+  return response;
+};
+
+// Simple API service wrapper
 class ApiService {
-  private static instance: ApiService;
-  private initialized: boolean = false;
-
-  private constructor() {
-    console.log('[ApiService] Constructor called');
-  }
-
-  static getInstance(): ApiService {
-    if (!ApiService.instance) {
-      ApiService.instance = new ApiService();
-    }
-    return ApiService.instance;
-  }
-
   async initialize(): Promise<void> {
-    console.log('[ApiService] Initializing...');
-    this.initialized = true;
-    console.log('[ApiService] ✅ Initialized');
+    console.log('[API] ✅ Ready');
   }
 
   async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
-    console.log('[ApiService] Fetching:', url);
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    });
-
-    console.log('[ApiService] Response:', response.status, response.ok ? '✅' : '❌');
-    return response;
+    return fetchWithAuth(url, options);
   }
 
   isInitialized(): boolean {
-    return this.initialized;
+    return true;
   }
 }
 
-export default ApiService.getInstance();
+export default new ApiService();

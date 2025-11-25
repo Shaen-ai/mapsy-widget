@@ -36,75 +36,42 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
   useEffect(() => {
     const initializeWidget = async () => {
-      console.log('[Widget] ========== WIDGET INIT START ==========');
-      console.log('[Widget] apiUrl prop:', apiUrl);
-      console.log('[Widget] externalConfig:', externalConfig);
-      console.log('[Widget] window.location:', window.location.href);
+      console.log('[Widget] Initializing...');
 
       try {
-        // Initialize Wix and API
-        console.log('[Widget] Step 1: Calling initializeApi()...');
         await initializeApi();
-        console.log('[Widget] Step 1: ✅ initializeApi() completed');
-
-        // Fetch data
-        console.log('[Widget] Step 2: Calling fetchConfig()...');
         await fetchConfig();
-        console.log('[Widget] Step 2: ✅ fetchConfig() completed');
-
-        console.log('[Widget] Step 3: Calling fetchLocations()...');
         await fetchLocations();
-        console.log('[Widget] Step 3: ✅ fetchLocations() completed');
-
-        console.log('[Widget] ✅ Initialization complete');
+        console.log('[Widget] ✅ Ready');
       } catch (error) {
-        console.error('[Widget] ❌ Initialization error:', error);
-        console.error('[Widget] Error name:', (error as Error)?.name);
-        console.error('[Widget] Error message:', (error as Error)?.message);
-        console.error('[Widget] Error stack:', (error as Error)?.stack);
+        console.error('[Widget] ❌ Error:', (error as Error)?.message);
       }
-
-      console.log('[Widget] ========== WIDGET INIT END ==========');
     };
 
     initializeWidget();
   }, [apiUrl]);
 
   const fetchConfig = async () => {
-    console.log('[fetchConfig] Starting...');
     try {
-      console.log('[fetchConfig] Calling widgetConfigService.getConfig()...');
       const configData = await widgetConfigService.getConfig();
-      console.log('[fetchConfig] ✅ Got config:', configData);
-      // Merge external config with fetched config
       const mergedConfig = { ...configData, ...externalConfig };
-      console.log('[fetchConfig] Merged config:', mergedConfig);
       setConfig(mergedConfig);
       setCurrentView(mergedConfig.defaultView || 'map');
     } catch (error) {
-      console.error('[fetchConfig] ❌ Error fetching widget config:', error);
-      console.error('[fetchConfig] Error details:', (error as Error)?.message);
-      // Use external config or defaults if fetch fails
+      console.error('[Config] ❌', (error as Error)?.message);
       setCurrentView(config.defaultView || 'map');
     }
-    console.log('[fetchConfig] Done');
   };
 
   const fetchLocations = async () => {
-    console.log('[fetchLocations] Starting...');
     try {
       setLoading(true);
-      console.log('[fetchLocations] Calling locationService.getAll()...');
       const data = await locationService.getAll();
-      console.log('[fetchLocations] ✅ Got locations:', data);
-      console.log('[fetchLocations] Location count:', data?.length);
       setLocations(data);
     } catch (error) {
-      console.error('[fetchLocations] ❌ Error fetching locations:', error);
-      console.error('[fetchLocations] Error details:', (error as Error)?.message);
+      console.error('[Locations] ❌', (error as Error)?.message);
     } finally {
       setLoading(false);
-      console.log('[fetchLocations] Done');
     }
   };
 
