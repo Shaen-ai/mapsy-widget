@@ -14,20 +14,28 @@ const wixClient = createClient({
 
 console.log('[Wix] ✅ Client created');
 
-// Export fetch function that uses Wix authentication
+// Fetch with Wix auth, fallback to direct fetch if auth fails (e.g., in editor preview)
 export const fetchWithAuth = async (url: string, options?: RequestInit): Promise<Response> => {
-  console.log('[Wix] Fetching:', url);
-
-  const response = await wixClient.fetchWithAuth(url, {
+  const fetchOptions = {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
     },
-  });
+  };
 
-  console.log('[Wix] Response:', response.status, response.ok ? '✅' : '❌');
-  return response;
+  try {
+    // Try Wix authenticated fetch
+    const response = await wixClient.fetchWithAuth(url, fetchOptions);
+    console.log('[Wix] Auth fetch:', response.status, response.ok ? '✅' : '❌');
+    return response;
+  } catch (error) {
+    // Fallback to direct fetch (for editor preview or when auth fails)
+    console.log('[Wix] Auth failed, using direct fetch');
+    const response = await fetch(url, fetchOptions);
+    console.log('[Wix] Direct fetch:', response.status, response.ok ? '✅' : '❌');
+    return response;
+  }
 };
 
 // Simple API service wrapper
