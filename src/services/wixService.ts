@@ -33,9 +33,9 @@ if (typeof window !== 'undefined') {
     try {
       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
 
-      // Log all messages for debugging (only in dev)
-      if (data && typeof data === 'object') {
-        console.log('[Wix] PostMessage received:', Object.keys(data).join(', '));
+      // Log messages that look like they contain useful data
+      if (data && typeof data === 'object' && (data.compId || data.instance || data.props || data.type)) {
+        console.log('[Wix] PostMessage:', JSON.stringify(data).substring(0, 200));
       }
 
       // Check for compId in various message formats
@@ -52,18 +52,38 @@ if (typeof window !== 'undefined') {
         console.log('[Wix] ✅ Instance from postMessage');
       }
 
-      // Wix custom element props format
-      if (data?.type === 'props' && data?.props) {
-        console.log('[Wix] Props message received:', Object.keys(data.props).join(', '));
-        if (data.props.compId && !compId) {
-          compId = data.props.compId;
-          console.log('[Wix] ✅ CompId from props message:', compId);
+      // Wix custom element widget props
+      if (data?.type === 'props' || data?.type === 'attributeChanged') {
+        console.log('[Wix] Wix message type:', data.type);
+        if (data.compId) {
+          compId = data.compId;
+          console.log('[Wix] ✅ CompId from Wix message:', compId);
+        }
+      }
+
+      // Wix TPA message format
+      if (data?.intent === 'TPA2') {
+        console.log('[Wix] TPA2 message received');
+        if (data.compId) {
+          compId = data.compId;
+          console.log('[Wix] ✅ CompId from TPA2:', compId);
         }
       }
     } catch (e) {
       // Not a JSON message, ignore
     }
   });
+
+  // Request compId from parent (Wix custom element communication)
+  if (window.parent !== window) {
+    try {
+      window.parent.postMessage({ type: 'getCompId', source: 'mapsy-widget' }, '*');
+      console.log('[Wix] Requested compId from parent');
+    } catch (e) {
+      // Parent communication failed
+    }
+  }
+
   console.log('[Wix] PostMessage listener registered');
 }
 
