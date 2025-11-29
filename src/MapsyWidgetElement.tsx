@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { setCompId, setInstanceToken } from './services/api';
 
 /**
  * Custom Element for Wix integration
@@ -29,7 +30,7 @@ class MapsyWidgetElement extends HTMLElement {
       'header-title', 'headertitle',
       'map-zoom-level', 'mapzoomlevel',
       'primary-color', 'primarycolor',
-      'api-url', 'compid', 'comp-id', 'config'
+      'api-url', 'compid', 'comp-id', 'instance', 'config'
     ];
   }
 
@@ -87,6 +88,12 @@ class MapsyWidgetElement extends HTMLElement {
         break;
       case 'compid':
       case 'comp-id':
+        // Set compId in the wixService for API requests
+        setCompId(newValue);
+        return;
+      case 'instance':
+        // Set instance token in the wixService for API requests
+        setInstanceToken(newValue);
         return;
       case 'config':
         try {
@@ -111,6 +118,8 @@ class MapsyWidgetElement extends HTMLElement {
     const mapZoomLevel = this.getAttribute('map-zoom-level');
     const primaryColor = this.getAttribute('primary-color');
     const apiUrl = this.getAttribute('api-url');
+    const compIdAttr = this.getAttribute('compid') || this.getAttribute('comp-id');
+    const instanceAttr = this.getAttribute('instance');
 
     if (defaultView) this.config.defaultView = defaultView as 'map' | 'list';
     if (showHeader !== null) this.config.showHeader = showHeader === 'true';
@@ -118,6 +127,14 @@ class MapsyWidgetElement extends HTMLElement {
     if (mapZoomLevel) this.config.mapZoomLevel = parseInt(mapZoomLevel, 10);
     if (primaryColor) this.config.primaryColor = primaryColor;
     if (apiUrl) this.config.apiUrl = apiUrl;
+
+    // Set Wix-specific attributes in the service
+    if (compIdAttr) {
+      setCompId(compIdAttr);
+    }
+    if (instanceAttr) {
+      setInstanceToken(instanceAttr);
+    }
   }
 
   private mountReactApp() {

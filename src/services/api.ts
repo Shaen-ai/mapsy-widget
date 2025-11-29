@@ -1,8 +1,11 @@
 import { Location } from '../types/location';
-import apiService from './wixService';
+import apiService, { getInstanceToken, getCompId, setCompId, setInstanceToken } from './wixService';
 
 // Backend API URL
 const API_BASE_URL = 'https://mapsy-api.nextechspires.com/api';
+
+// Re-export Wix helpers for use in other modules
+export { getInstanceToken, getCompId, setCompId, setInstanceToken };
 
 // Initialize API
 export const initializeApi = async () => {
