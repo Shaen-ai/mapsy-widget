@@ -26,12 +26,74 @@ try {
 }
 
 /**
+ * Listen for postMessage from parent window (Wix sends data this way to iframes)
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', (event) => {
+    try {
+      const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+      // Log all messages for debugging (only in dev)
+      if (data && typeof data === 'object') {
+        console.log('[Wix] PostMessage received:', Object.keys(data).join(', '));
+      }
+
+      // Check for compId in various message formats
+      if (data?.compId && !compId) {
+        compId = data.compId;
+        console.log('[Wix] ✅ CompId from postMessage:', compId);
+      }
+      if (data?.props?.compId && !compId) {
+        compId = data.props.compId;
+        console.log('[Wix] ✅ CompId from postMessage props:', compId);
+      }
+      if (data?.instance && !instanceToken) {
+        instanceToken = data.instance;
+        console.log('[Wix] ✅ Instance from postMessage');
+      }
+
+      // Wix custom element props format
+      if (data?.type === 'props' && data?.props) {
+        console.log('[Wix] Props message received:', Object.keys(data.props).join(', '));
+        if (data.props.compId && !compId) {
+          compId = data.props.compId;
+          console.log('[Wix] ✅ CompId from props message:', compId);
+        }
+      }
+    } catch (e) {
+      // Not a JSON message, ignore
+    }
+  });
+  console.log('[Wix] PostMessage listener registered');
+}
+
+/**
  * Get compId from Wix widget element's data attributes or parent Wix component
  */
 const extractCompIdFromElement = (): string | null => {
   if (typeof document === 'undefined') return null;
 
   console.log('[Wix] Searching for compId in DOM...');
+
+  // Check wix-internal-id element (Wix iframe container)
+  const wixInternalEl = document.getElementById('wix-internal-id');
+  if (wixInternalEl) {
+    // Log all attributes for debugging
+    const attrs: string[] = [];
+    for (let i = 0; i < wixInternalEl.attributes.length; i++) {
+      const attr = wixInternalEl.attributes[i];
+      attrs.push(`${attr.name}="${attr.value}"`);
+    }
+    console.log('[Wix] wix-internal-id attributes:', attrs.join(', '));
+
+    // Check for data attributes that might contain compId
+    const dataCompId = wixInternalEl.getAttribute('data-comp-id') ||
+                       wixInternalEl.getAttribute('data-wix-comp-id');
+    if (dataCompId) {
+      console.log('[Wix] ✅ CompId from wix-internal-id:', dataCompId);
+      return dataCompId;
+    }
+  }
 
   // Look for mapsy-widget element
   const widget = document.querySelector('mapsy-widget');
@@ -57,49 +119,17 @@ const extractCompIdFromElement = (): string | null => {
       console.log('[Wix] ✅ CompId from widget attribute:', wixCompId);
       return wixCompId;
     }
-
-    // Walk up the DOM tree to find a Wix component wrapper with an ID
-    console.log('[Wix] Walking up DOM tree...');
-    let parent = widget.parentElement;
-    let depth = 0;
-    while (parent && depth < 20) {
-      const tagInfo = `${parent.tagName.toLowerCase()}${parent.id ? '#' + parent.id : ''}${parent.className ? '.' + String(parent.className).split(' ')[0] : ''}`;
-
-      // Wix components typically have IDs like "comp-xxxxx"
-      if (parent.id && parent.id.startsWith('comp-')) {
-        console.log('[Wix] ✅ CompId from parent element ID:', parent.id, `(depth: ${depth})`);
-        return parent.id;
-      }
-      // Also check for data-comp-id attribute
-      const parentCompId = parent.getAttribute('data-comp-id');
-      if (parentCompId) {
-        console.log('[Wix] ✅ CompId from parent data-comp-id:', parentCompId, `(depth: ${depth})`);
-        return parentCompId;
-      }
-
-      // Log first few parents for debugging
-      if (depth < 5) {
-        console.log(`[Wix] Parent ${depth}: ${tagInfo}`);
-      }
-
-      parent = parent.parentElement;
-      depth++;
-    }
-    console.log('[Wix] No comp-* ID found in parent chain (searched ${depth} levels)');
-  } else {
-    console.log('[Wix] mapsy-widget element not found in DOM yet');
   }
 
-  // Also check for comp id in any element on the page
+  // Check for comp id in any element on the page
   const compElements = document.querySelectorAll('[id^="comp-"]');
-  console.log(`[Wix] Found ${compElements.length} elements with comp-* IDs on page`);
-
   if (compElements.length > 0) {
-    // Log first few for debugging
     const samples = Array.from(compElements).slice(0, 3).map(el => el.id);
-    console.log('[Wix] Sample comp IDs:', samples.join(', '));
+    console.log('[Wix] Found comp-* IDs:', samples.join(', '));
+    return compElements[0].id;
   }
 
+  console.log('[Wix] No compId found in DOM');
   return null;
 };
 
@@ -114,35 +144,22 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
 
   const win = window as any;
 
-  console.log('[Wix] Checking window globals...');
-
   // Log available Wix-related globals
-  const wixGlobals = ['Wix', 'wixDevelopersAnalytics', 'viewerModel', 'warmupData', 'wixBiSession', 'fedops', '__VIEWER_MODEL__', 'rendererModel', 'wixEmbedsAPI'];
+  const wixGlobals = ['Wix', 'wixEmbedsAPI', 'rendererModel', 'warmupData', '__VIEWER_MODEL__'];
   const foundGlobals = wixGlobals.filter(g => win[g] !== undefined);
-  console.log('[Wix] Available globals:', foundGlobals.length > 0 ? foundGlobals.join(', ') : 'none');
-
-  // Check rendererModel (common in Wix)
-  if (win.rendererModel) {
-    console.log('[Wix] rendererModel keys:', Object.keys(win.rendererModel).join(', '));
-    if (win.rendererModel.siteInfo?.siteId) {
-      console.log('[Wix] SiteId from rendererModel:', win.rendererModel.siteInfo.siteId);
-    }
+  if (foundGlobals.length > 0) {
+    console.log('[Wix] Available globals:', foundGlobals.join(', '));
   }
 
-  // Check wixEmbedsAPI
-  if (win.wixEmbedsAPI) {
-    console.log('[Wix] wixEmbedsAPI available');
-    if (typeof win.wixEmbedsAPI.getAppToken === 'function') {
-      try {
-        const token = win.wixEmbedsAPI.getAppToken?.();
-        if (token) {
-          instance = token;
-          console.log('[Wix] ✅ Instance from wixEmbedsAPI.getAppToken()');
-        }
-      } catch (e) {
-        console.log('[Wix] wixEmbedsAPI.getAppToken() failed');
+  // Check wixEmbedsAPI (common way to get app token)
+  if (win.wixEmbedsAPI?.getAppToken) {
+    try {
+      const token = win.wixEmbedsAPI.getAppToken();
+      if (token) {
+        instance = token;
+        console.log('[Wix] ✅ Instance from wixEmbedsAPI');
       }
-    }
+    } catch (e) { /* ignore */ }
   }
 
   // Check warmupData
@@ -151,20 +168,10 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
     console.log('[Wix] ✅ Instance from warmupData');
   }
 
-  // Check for componentId in various places
+  // Check for componentId
   if (win.warmupData?.wixCodeModel?.componentId) {
     extractedCompId = win.warmupData.wixCodeModel.componentId;
     console.log('[Wix] ✅ CompId from warmupData:', extractedCompId);
-  }
-
-  if (win.fedops?.data?.params?.componentId) {
-    extractedCompId = win.fedops.data.params.componentId;
-    console.log('[Wix] ✅ CompId from fedops:', extractedCompId);
-  }
-
-  if (win.__VIEWER_MODEL__?.siteFeaturesConfigs?.platform?.componentId) {
-    extractedCompId = win.__VIEWER_MODEL__.siteFeaturesConfigs.platform.componentId;
-    console.log('[Wix] ✅ CompId from __VIEWER_MODEL__');
   }
 
   return { instance, compId: extractedCompId };
@@ -194,11 +201,10 @@ const extractInstanceFromUrl = (): string | null => {
  * Initialize and retrieve Wix instance token and compId
  */
 const initializeWixData = async (): Promise<void> => {
-  console.log('[Wix] === Starting Wix Data Initialization ===');
+  console.log('[Wix] Initializing...');
+  console.log('[Wix] URL:', window.location.href);
 
-  // Step 1: Check URL parameters
-  console.log('[Wix] Step 1: Checking URL params...');
-  console.log('[Wix] Current URL:', window.location.href);
+  // 1. Check URL parameters
   const urlCompId = extractCompIdFromUrl();
   const urlInstance = extractInstanceFromUrl();
   if (urlCompId) {
@@ -210,8 +216,7 @@ const initializeWixData = async (): Promise<void> => {
     console.log('[Wix] ✅ Instance from URL');
   }
 
-  // Step 2: Check DOM elements
-  console.log('[Wix] Step 2: Checking DOM elements...');
+  // 2. Check DOM elements
   if (!compId) {
     const elementCompId = extractCompIdFromElement();
     if (elementCompId) {
@@ -219,8 +224,7 @@ const initializeWixData = async (): Promise<void> => {
     }
   }
 
-  // Step 3: Check Wix window globals
-  console.log('[Wix] Step 3: Checking window globals...');
+  // 3. Check Wix window globals
   const wixGlobals = extractInstanceFromWixGlobals();
   if (!instanceToken && wixGlobals.instance) {
     instanceToken = wixGlobals.instance;
@@ -229,46 +233,37 @@ const initializeWixData = async (): Promise<void> => {
     compId = wixGlobals.compId;
   }
 
-  // Step 4: Try Wix SDK methods
-  console.log('[Wix] Step 4: Checking Wix SDK...');
+  // 4. Try Wix SDK methods
   if (isWixEnvironment && wixClient) {
-    console.log('[Wix] Wix client available, trying SDK methods...');
     try {
       if (wixClient.auth && typeof (wixClient.auth as any).getAccessToken === 'function') {
         const tokenData = await (wixClient.auth as any).getAccessToken();
         if (tokenData?.accessToken && !instanceToken) {
           instanceToken = tokenData.accessToken;
-          console.log('[Wix] ✅ Instance from SDK getAccessToken()');
+          console.log('[Wix] ✅ Instance from SDK');
         }
       }
     } catch (error) {
-      console.log('[Wix] SDK getAccessToken() failed:', (error as Error).message);
+      // SDK method failed, continue
     }
 
     // Try legacy Wix.Utils API
     try {
-      if (typeof (window as any).Wix !== 'undefined') {
-        const wixContext = (window as any).Wix;
-        console.log('[Wix] Legacy Wix object found, keys:', Object.keys(wixContext).join(', '));
-        if (wixContext.Utils?.getCompId) {
-          const wixCompId = await wixContext.Utils.getCompId();
-          if (wixCompId && !compId) {
-            compId = wixCompId;
-            console.log('[Wix] ✅ CompId from Wix.Utils.getCompId():', compId);
-          }
+      const wixContext = (window as any).Wix;
+      if (wixContext?.Utils?.getCompId) {
+        const wixCompId = await wixContext.Utils.getCompId();
+        if (wixCompId && !compId) {
+          compId = wixCompId;
+          console.log('[Wix] ✅ CompId from Wix.Utils:', compId);
         }
       }
     } catch (error) {
-      console.log('[Wix] Wix.Utils failed:', (error as Error).message);
+      // Legacy API failed, continue
     }
-  } else {
-    console.log('[Wix] Wix client not available (isWixEnvironment:', isWixEnvironment, ')');
   }
 
   // Final summary
-  console.log('[Wix] === Initialization Complete ===');
-  console.log('[Wix] Final Instance:', instanceToken ? '✅ Available' : '❌ Not available');
-  console.log('[Wix] Final CompId:', compId ? `✅ ${compId}` : '❌ Not available');
+  console.log('[Wix] Result - Instance:', instanceToken ? '✅' : '❌', 'CompId:', compId || '❌');
 };
 
 /**
