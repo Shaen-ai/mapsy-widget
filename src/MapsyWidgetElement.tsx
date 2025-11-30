@@ -37,6 +37,14 @@ class MapsyWidgetElement extends HTMLElement {
   async connectedCallback() {
     if (this._initialized) return;
 
+    // Debug: Log all attributes on the element
+    const attrs: string[] = [];
+    for (let i = 0; i < this.attributes.length; i++) {
+      const attr = this.attributes[i];
+      attrs.push(`${attr.name}="${attr.value.substring(0, 50)}"`);
+    }
+    console.log('[Widget] Element attributes:', attrs.join(', ') || 'none');
+
     try {
       this.updateConfigFromAttributes();
       this.mountReactApp();
