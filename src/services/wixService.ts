@@ -24,6 +24,16 @@ try {
 
   const hostResult = site.host({ applicationId: APP_ID });
   console.log('[WixClient] 🏠 site.host() result:', hostResult);
+  console.log('[WixClient] 🏠 site.host() keys:', Object.keys(hostResult || {}));
+
+  // Check if host has channel with useful data
+  if (hostResult?.channel) {
+    console.log('[WixClient] 🏠 host.channel:', hostResult.channel);
+    console.log('[WixClient] 🏠 host.channel keys:', Object.keys(hostResult.channel || {}));
+  }
+  if (hostResult?.essentials) {
+    console.log('[WixClient] 🏠 host.essentials:', hostResult.essentials);
+  }
 
   wixClient = createClient({
     auth: authResult,
@@ -101,12 +111,23 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 /**
- * Listen for postMessage from parent window (Wix sends data this way to iframes)
+ * Listen for postMessage from parent window (Wix sends data this way to custom elements in iframes)
  */
 if (typeof window !== 'undefined') {
+  // Log all incoming messages for debugging
   window.addEventListener('message', (event) => {
+    // Log all messages to help debug what Wix sends
+    console.log('[WixMessage] 📨 Received message from:', event.origin);
+    console.log('[WixMessage] 📨 Message data type:', typeof event.data);
+
     try {
       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+      // Log the full message structure for debugging
+      if (data && typeof data === 'object') {
+        console.log('[WixMessage] 📨 Message keys:', Object.keys(data));
+        console.log('[WixMessage] 📨 Full message:', JSON.stringify(data).substring(0, 500));
+      }
 
       // Check for compId in various message formats
       if (data?.compId && !compId) {
@@ -124,6 +145,7 @@ if (typeof window !== 'undefined') {
 
       // Wix custom element widget props
       if (data?.type === 'props' || data?.type === 'attributeChanged') {
+        console.log('[WixMessage] 📨 Props/attributeChanged message:', data);
         if (data.compId && !compId) {
           compId = data.compId;
           console.log('[Wix] ✅ CompId from Wix message:', compId);
@@ -132,13 +154,27 @@ if (typeof window !== 'undefined') {
 
       // Wix TPA message format
       if (data?.intent === 'TPA2') {
+        console.log('[WixMessage] 📨 TPA2 message:', data);
         if (data.compId && !compId) {
           compId = data.compId;
           console.log('[Wix] ✅ CompId from TPA2:', compId);
         }
       }
+
+      // Wix custom element SDK channel messages
+      if (data?.type === 'wix-sdk') {
+        console.log('[WixMessage] 📨 Wix SDK message:', data);
+      }
+
+      // Check for Wix host channel data
+      if (data?.channel || data?.host) {
+        console.log('[WixMessage] 📨 Wix channel/host data:', data);
+      }
     } catch (e) {
-      // Not a JSON message, ignore
+      // Not a JSON message, log raw data for debugging
+      if (event.data && typeof event.data === 'string' && event.data.length < 200) {
+        console.log('[WixMessage] 📨 Non-JSON message:', event.data);
+      }
     }
   });
 
@@ -146,8 +182,9 @@ if (typeof window !== 'undefined') {
   if (window.parent !== window) {
     try {
       window.parent.postMessage({ type: 'getCompId', source: 'mapsy-widget' }, '*');
+      console.log('[WixMessage] 📤 Sent getCompId request to parent');
     } catch (e) {
-      // Parent communication failed
+      console.log('[WixMessage] ❌ Failed to send message to parent');
     }
   }
 }
@@ -205,6 +242,16 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
 
   const win = window as any;
 
+  // Log all window properties that might contain Wix data
+  console.log('[WixGlobals] Checking window for Wix data...');
+  console.log('[WixGlobals] window.wixEmbedsAPI:', win.wixEmbedsAPI);
+  console.log('[WixGlobals] window.warmupData:', win.warmupData);
+  console.log('[WixGlobals] window.wixPerformanceMeasurements:', win.wixPerformanceMeasurements);
+  console.log('[WixGlobals] window.__EDITOR_DATA__:', win.__EDITOR_DATA__);
+  console.log('[WixGlobals] window.viewerModel:', win.viewerModel);
+  console.log('[WixGlobals] window.rendererModel:', win.rendererModel);
+  console.log('[WixGlobals] window.publicData:', win.publicData);
+
   // Check wixEmbedsAPI (common way to get app token)
   if (win.wixEmbedsAPI?.getAppToken) {
     try {
@@ -213,7 +260,29 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
         instance = token;
         console.log('[Wix] ✅ Instance from wixEmbedsAPI');
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      console.log('[WixGlobals] wixEmbedsAPI.getAppToken() failed:', e);
+    }
+  }
+
+  // Check wixEmbedsAPI for other useful methods
+  if (win.wixEmbedsAPI) {
+    console.log('[WixGlobals] wixEmbedsAPI methods:', Object.keys(win.wixEmbedsAPI));
+    if (win.wixEmbedsAPI.getExternalId) {
+      try {
+        const externalId = win.wixEmbedsAPI.getExternalId();
+        console.log('[WixGlobals] wixEmbedsAPI.getExternalId():', externalId);
+      } catch (e) { /* ignore */ }
+    }
+    if (win.wixEmbedsAPI.getInstanceId) {
+      try {
+        const instanceId = win.wixEmbedsAPI.getInstanceId();
+        console.log('[WixGlobals] wixEmbedsAPI.getInstanceId():', instanceId);
+        if (instanceId && !instance) {
+          instance = instanceId;
+        }
+      } catch (e) { /* ignore */ }
+    }
   }
 
   // Check warmupData
@@ -226,6 +295,22 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
   if (win.warmupData?.wixCodeModel?.componentId) {
     extractedCompId = win.warmupData.wixCodeModel.componentId;
     console.log('[Wix] ✅ CompId from warmupData:', extractedCompId);
+  }
+
+  // Check viewerModel for instance data
+  if (win.viewerModel?.site?.instanceId) {
+    console.log('[WixGlobals] viewerModel.site.instanceId:', win.viewerModel.site.instanceId);
+    if (!instance) {
+      instance = win.viewerModel.site.instanceId;
+    }
+  }
+
+  // Check rendererModel
+  if (win.rendererModel?.siteInfo?.instanceId) {
+    console.log('[WixGlobals] rendererModel.siteInfo.instanceId:', win.rendererModel.siteInfo.instanceId);
+    if (!instance) {
+      instance = win.rendererModel.siteInfo.instanceId;
+    }
   }
 
   return { instance, compId: extractedCompId };
