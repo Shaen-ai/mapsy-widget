@@ -9,17 +9,96 @@ let instanceToken: string | null = null;
 let compId: string | null = null;
 let wixClient: ReturnType<typeof createClient> | null = null;
 let isWixEnvironment = false;
+let accessTokenInjector: (() => Promise<{ accessToken: string | null }>) | null = null;
 
-// Create Wix client with site authentication (as per Wix docs)
+// Create Wix client with site authentication (as per Wix docs for self-hosted apps)
+console.log('[WixClient] 🔄 Attempting to create Wix client...');
+console.log('[WixClient] APP_ID:', APP_ID);
 try {
+  console.log('[WixClient] 📦 site module:', site);
+  console.log('[WixClient] 📦 site.auth:', typeof site?.auth);
+  console.log('[WixClient] 📦 site.host:', typeof site?.host);
+
+  const authResult = site.auth();
+  console.log('[WixClient] 🔐 site.auth() result:', authResult);
+
+  const hostResult = site.host({ applicationId: APP_ID });
+  console.log('[WixClient] 🏠 site.host() result:', hostResult);
+
   wixClient = createClient({
-    auth: site.auth(),
-    host: site.host({ applicationId: APP_ID }),
+    auth: authResult,
+    host: hostResult,
   });
+
+  console.log('[WixClient] ✅ Wix client created successfully');
+  console.log('[WixClient] 📋 Client keys:', Object.keys(wixClient || {}));
+  console.log('[WixClient] 🔐 Client auth:', wixClient?.auth);
+  console.log('[WixClient] 📡 Client fetchWithAuth:', typeof wixClient?.fetchWithAuth);
+
+  // Get access token injector (as per Wix docs for self-hosted Site Widget)
+  if (wixClient?.auth?.getAccessTokenInjector) {
+    accessTokenInjector = wixClient.auth.getAccessTokenInjector();
+    console.log('[WixClient] ✅ Access token injector obtained');
+  } else {
+    console.log('[WixClient] ⚠️ getAccessTokenInjector not available on auth');
+  }
+
   isWixEnvironment = true;
+  console.log('[WixClient] ✅ isWixEnvironment set to:', isWixEnvironment);
 } catch (error) {
+  console.error('[WixClient] ❌ Failed to create Wix client:', error);
+  console.error('[WixClient] ❌ Error details:', {
+    message: (error as Error)?.message,
+    stack: (error as Error)?.stack,
+  });
   isWixEnvironment = false;
 }
+
+/**
+ * Get the Wix client instance
+ */
+export const getWixClient = () => wixClient;
+
+/**
+ * Get access token using the injector (for self-hosted apps)
+ * This is the recommended way per Wix docs
+ */
+export const getAccessToken = async (): Promise<string | null> => {
+  console.log('[WixAuth] 🔄 Getting access token...');
+
+  // Method 1: Use access token injector (preferred for self-hosted widgets)
+  if (accessTokenInjector) {
+    try {
+      console.log('[WixAuth] Using accessTokenInjector...');
+      const result = await accessTokenInjector();
+      console.log('[WixAuth] accessTokenInjector result:', result);
+      if (result?.accessToken) {
+        console.log('[WixAuth] ✅ Got access token from injector');
+        return result.accessToken;
+      }
+    } catch (error) {
+      console.error('[WixAuth] ❌ accessTokenInjector failed:', error);
+    }
+  }
+
+  // Method 2: Try wixClient.auth.getAccessToken
+  if (wixClient?.auth && typeof (wixClient.auth as any).getAccessToken === 'function') {
+    try {
+      console.log('[WixAuth] Using wixClient.auth.getAccessToken...');
+      const tokenData = await (wixClient.auth as any).getAccessToken();
+      console.log('[WixAuth] getAccessToken result:', tokenData);
+      if (tokenData?.accessToken) {
+        console.log('[WixAuth] ✅ Got access token from SDK');
+        return tokenData.accessToken;
+      }
+    } catch (error) {
+      console.error('[WixAuth] ❌ getAccessToken failed:', error);
+    }
+  }
+
+  console.log('[WixAuth] ⚠️ No access token available');
+  return null;
+};
 
 /**
  * Listen for postMessage from parent window (Wix sends data this way to iframes)
@@ -153,42 +232,56 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
 };
 
 /**
- * Extract compId from URL query parameters
+ * Extract compId from URL query parameters (as per Wix docs - compId is passed as URL param)
  */
 const extractCompIdFromUrl = (): string | null => {
   if (typeof window === 'undefined') return null;
 
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('compId') || urlParams.get('comp-id') || urlParams.get('comp_id') || null;
+  const urlCompId = urlParams.get('compId') || urlParams.get('comp-id') || urlParams.get('comp_id') || null;
+  if (urlCompId) {
+    console.log('[Wix] Found compId in URL:', urlCompId);
+  }
+  return urlCompId;
 };
 
 /**
- * Extract instance token from URL query parameters (for iframe scenarios)
+ * Extract instance token from URL query parameters (for External URL extensions)
  */
 const extractInstanceFromUrl = (): string | null => {
   if (typeof window === 'undefined') return null;
 
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('instance') || null;
+  const urlInstance = urlParams.get('instance') || null;
+  if (urlInstance) {
+    console.log('[Wix] Found instance in URL (first 30 chars):', urlInstance.substring(0, 30) + '...');
+  }
+  return urlInstance;
 };
 
 /**
  * Initialize and retrieve Wix instance token and compId
  */
 const initializeWixData = async (): Promise<void> => {
-  // 1. Check URL parameters
+  console.log('[WixInit] 🔄 Starting initializeWixData...');
+  console.log('[WixInit] 📍 Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
+
+  // 1. Check URL parameters (compId is passed as URL param per Wix docs)
+  console.log('[WixInit] 1️⃣ Checking URL parameters...');
   const urlCompId = extractCompIdFromUrl();
   const urlInstance = extractInstanceFromUrl();
+
   if (urlCompId) {
     compId = urlCompId;
-    console.log('[Wix] ✅ CompId from URL:', compId);
+    console.log('[WixInit] ✅ CompId from URL:', compId);
   }
   if (urlInstance) {
     instanceToken = urlInstance;
-    console.log('[Wix] ✅ Instance from URL');
+    console.log('[WixInit] ✅ Instance from URL');
   }
 
   // 2. Check DOM elements
+  console.log('[WixInit] 2️⃣ Checking DOM elements...');
   if (!compId) {
     const elementCompId = extractCompIdFromElement();
     if (elementCompId) {
@@ -197,6 +290,7 @@ const initializeWixData = async (): Promise<void> => {
   }
 
   // 3. Check Wix window globals
+  console.log('[WixInit] 3️⃣ Checking Wix window globals...');
   const wixGlobals = extractInstanceFromWixGlobals();
   if (!instanceToken && wixGlobals.instance) {
     instanceToken = wixGlobals.instance;
@@ -205,34 +299,48 @@ const initializeWixData = async (): Promise<void> => {
     compId = wixGlobals.compId;
   }
 
-  // 4. Try Wix SDK methods
-  if (isWixEnvironment && wixClient) {
-    try {
-      if (wixClient.auth && typeof (wixClient.auth as any).getAccessToken === 'function') {
-        const tokenData = await (wixClient.auth as any).getAccessToken();
-        if (tokenData?.accessToken && !instanceToken) {
-          instanceToken = tokenData.accessToken;
-          console.log('[Wix] ✅ Instance from SDK');
-        }
-      }
-    } catch (error) {
-      // SDK method failed, continue
-    }
-
-    // Try legacy Wix.Utils API
-    try {
-      const wixContext = (window as any).Wix;
-      if (wixContext?.Utils?.getCompId) {
-        const wixCompId = await wixContext.Utils.getCompId();
-        if (wixCompId && !compId) {
-          compId = wixCompId;
-          console.log('[Wix] ✅ CompId from Wix.Utils:', compId);
-        }
-      }
-    } catch (error) {
-      // Legacy API failed, continue
+  // 4. Try to get access token from Wix SDK (for self-hosted Site Widget)
+  console.log('[WixInit] 4️⃣ Getting access token from Wix SDK...');
+  if (isWixEnvironment && !instanceToken) {
+    const accessToken = await getAccessToken();
+    if (accessToken) {
+      instanceToken = accessToken;
+      console.log('[WixInit] ✅ Got instance token from Wix SDK');
     }
   }
+
+  // 5. Try legacy Wix.Utils API
+  console.log('[WixInit] 5️⃣ Trying legacy Wix.Utils API...');
+  try {
+    const wixContext = (window as any).Wix;
+    console.log('[WixInit] window.Wix:', wixContext);
+
+    if (wixContext?.Utils?.getCompId && !compId) {
+      const wixCompId = await wixContext.Utils.getCompId();
+      if (wixCompId) {
+        compId = wixCompId;
+        console.log('[WixInit] ✅ CompId from Wix.Utils:', compId);
+      }
+    }
+
+    if (wixContext?.Utils?.getInstance && !instanceToken) {
+      const wixInstance = wixContext.Utils.getInstance();
+      if (wixInstance) {
+        instanceToken = wixInstance;
+        console.log('[WixInit] ✅ Instance from Wix.Utils.getInstance');
+      }
+    }
+  } catch (error) {
+    console.log('[WixInit] Legacy Wix.Utils not available');
+  }
+
+  // Final summary
+  console.log('[WixInit] ========== SUMMARY ==========');
+  console.log('[WixInit] compId:', compId);
+  console.log('[WixInit] instanceToken:', instanceToken ? `${instanceToken.substring(0, 30)}...` : null);
+  console.log('[WixInit] isWixEnvironment:', isWixEnvironment);
+  console.log('[WixInit] wixClient available:', !!wixClient);
+  console.log('[WixInit] ==============================');
 };
 
 /**
@@ -254,6 +362,7 @@ export const getCompId = (): string | null => {
  */
 export const setCompId = (id: string): void => {
   compId = id;
+  console.log('[Wix] CompId set to:', id);
 };
 
 /**
@@ -261,6 +370,7 @@ export const setCompId = (id: string): void => {
  */
 export const setInstanceToken = (token: string): void => {
   instanceToken = token;
+  console.log('[Wix] Instance token set');
 };
 
 /**
@@ -270,41 +380,62 @@ export const isInWixEnvironment = (): boolean => {
   return isWixEnvironment;
 };
 
-// Fetch with Wix auth, fallback to direct fetch if auth fails (e.g., in editor preview)
+/**
+ * Fetch with Wix authentication
+ * Per Wix docs: Use wixClient.fetchWithAuth() to send the access token to your backend
+ * The backend can then extract instanceId from the token via Wix API
+ */
 export const fetchWithAuth = async (url: string, options?: RequestInit): Promise<Response> => {
-  // Add compId header if available
+  console.log('[FetchWithAuth] 🔄 Starting fetch to:', url);
+  console.log('[FetchWithAuth] Method:', options?.method || 'GET');
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string>),
   };
 
+  // Add compId header if available
   if (compId) {
     headers['X-Wix-Comp-Id'] = compId;
+    console.log('[FetchWithAuth] ✅ Added X-Wix-Comp-Id header:', compId);
   }
 
-  // Add instance token to Authorization header if available
-  if (instanceToken) {
-    headers['Authorization'] = `Bearer ${instanceToken}`;
-  }
-
-  const fetchOptions = {
+  const fetchOptions: RequestInit = {
     ...options,
     headers,
   };
 
-  // If in Wix environment and client available, use authenticated fetch
-  if (isWixEnvironment && wixClient) {
+  // Use Wix authenticated fetch if available (recommended per Wix docs)
+  // This automatically injects the Wix access token
+  if (isWixEnvironment && wixClient?.fetchWithAuth) {
+    console.log('[FetchWithAuth] 🔐 Using wixClient.fetchWithAuth (Wix recommended method)...');
     try {
-      // Try Wix authenticated fetch - this adds the Wix auth headers automatically
       const response = await wixClient.fetchWithAuth(url, fetchOptions);
+      console.log('[FetchWithAuth] ✅ wixClient.fetchWithAuth response:', response.status);
       return response;
     } catch (error: any) {
-      // Fallback to direct fetch (for editor preview or when auth fails)
+      console.error('[FetchWithAuth] ❌ wixClient.fetchWithAuth failed:', error?.message);
+      console.log('[FetchWithAuth] Falling back to direct fetch with manual token...');
     }
   }
 
-  // Direct fetch (non-Wix or fallback)
-  const response = await fetch(url, fetchOptions);
+  // Fallback: Add instance token manually to Authorization header
+  if (instanceToken) {
+    headers['Authorization'] = `Bearer ${instanceToken}`;
+    console.log('[FetchWithAuth] ✅ Added Authorization header with instance token');
+  } else {
+    console.log('[FetchWithAuth] ⚠️ No instance token available');
+  }
+
+  // Direct fetch
+  console.log('[FetchWithAuth] 📡 Using direct fetch...');
+  console.log('[FetchWithAuth] Final headers:', Object.keys(headers));
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+  console.log('[FetchWithAuth] Direct fetch response:', response.status);
   return response;
 };
 
@@ -313,10 +444,16 @@ class ApiService {
   private initialized = false;
 
   async initialize(): Promise<void> {
-    if (this.initialized) return;
+    console.log('[ApiService] 🔄 initialize() called, already initialized:', this.initialized);
+    if (this.initialized) {
+      console.log('[ApiService] ⏩ Already initialized, skipping');
+      return;
+    }
 
+    console.log('[ApiService] 🚀 Running initializeWixData...');
     await initializeWixData();
     this.initialized = true;
+    console.log('[ApiService] ✅ Initialization complete');
   }
 
   async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
@@ -341,6 +478,14 @@ class ApiService {
 
   setInstanceToken(token: string): void {
     setInstanceToken(token);
+  }
+
+  getWixClient() {
+    return wixClient;
+  }
+
+  isWixEnvironment(): boolean {
+    return isWixEnvironment;
   }
 }
 

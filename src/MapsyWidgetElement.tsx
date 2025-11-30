@@ -1,10 +1,19 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { setCompId, setInstanceToken } from './services/api';
+import {
+  setCompId,
+  setInstanceToken,
+  getWixClient,
+  isInWixEnvironment
+} from './services/api';
 
 /**
  * Custom Element for Wix integration
+ * Per Wix docs for self-hosted Site Widget:
+ * - compId is passed as URL query parameter
+ * - instanceId must be extracted securely via backend by sending Wix access token
+ * - Use wixClient.fetchWithAuth() to send requests with access token
  */
 class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
@@ -20,7 +29,20 @@ class MapsyWidgetElement extends HTMLElement {
 
   constructor() {
     super();
+    console.log('[MapsyWidget] Constructor called');
     this.attachShadow({ mode: 'open' });
+
+    // Log Wix client status at construction time
+    const wixClient = getWixClient();
+    console.log('[MapsyWidget] Wix client available:', !!wixClient);
+    console.log('[MapsyWidget] Is Wix environment:', isInWixEnvironment());
+
+    // Try to get access token injector early (as per Wix docs)
+    if (wixClient?.auth?.getAccessTokenInjector) {
+      console.log('[MapsyWidget] ✅ Access token injector available on wixClient');
+    } else {
+      console.log('[MapsyWidget] ⚠️ Access token injector NOT available');
+    }
   }
 
   static get observedAttributes() {
