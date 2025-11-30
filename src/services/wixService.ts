@@ -9,58 +9,30 @@ let instanceToken: string | null = null;
 let compId: string | null = null;
 let wixClient: ReturnType<typeof createClient> | null = null;
 let isWixEnvironment = false;
-let accessTokenInjector: (() => Promise<{ accessToken: string | null }>) | null = null;
+
+// Access token listener - stored as per Wix example
+let accessTokenListener: any = null;
 
 // Create Wix client with site authentication (as per Wix docs for self-hosted apps)
 console.log('[WixClient] 🔄 Attempting to create Wix client...');
 console.log('[WixClient] APP_ID:', APP_ID);
 try {
-  console.log('[WixClient] 📦 site module:', site);
-  console.log('[WixClient] 📦 site.auth:', typeof site?.auth);
-  console.log('[WixClient] 📦 site.host:', typeof site?.host);
-
-  const authResult = site.auth();
-  console.log('[WixClient] 🔐 site.auth() result:', authResult);
-
-  const hostResult = site.host({ applicationId: APP_ID });
-  console.log('[WixClient] 🏠 site.host() result:', hostResult);
-  console.log('[WixClient] 🏠 site.host() keys:', Object.keys(hostResult || {}));
-
-  // Check if host has channel with useful data
-  if (hostResult?.channel) {
-    console.log('[WixClient] 🏠 host.channel:', hostResult.channel);
-    console.log('[WixClient] 🏠 host.channel keys:', Object.keys(hostResult.channel || {}));
-  }
-  if (hostResult?.essentials) {
-    console.log('[WixClient] 🏠 host.essentials:', hostResult.essentials);
-  }
-
   wixClient = createClient({
-    auth: authResult,
-    host: hostResult,
+    auth: site.auth(),
+    host: site.host({ applicationId: APP_ID }),
   });
+
+  // Store the access token listener (as per Wix example)
+  // This is required for fetchWithAuth to work
+  accessTokenListener = wixClient.auth.getAccessTokenInjector();
 
   console.log('[WixClient] ✅ Wix client created successfully');
-  console.log('[WixClient] 📋 Client keys:', Object.keys(wixClient || {}));
-  console.log('[WixClient] 🔐 Client auth:', wixClient?.auth);
-  console.log('[WixClient] 📡 Client fetchWithAuth:', typeof wixClient?.fetchWithAuth);
-
-  // Get access token injector (as per Wix docs for self-hosted Site Widget)
-  if (wixClient?.auth?.getAccessTokenInjector) {
-    accessTokenInjector = wixClient.auth.getAccessTokenInjector();
-    console.log('[WixClient] ✅ Access token injector obtained');
-  } else {
-    console.log('[WixClient] ⚠️ getAccessTokenInjector not available on auth');
-  }
+  console.log('[WixClient] ✅ Access token listener stored:', !!accessTokenListener);
+  console.log('[WixClient] 📡 fetchWithAuth available:', typeof wixClient?.fetchWithAuth);
 
   isWixEnvironment = true;
-  console.log('[WixClient] ✅ isWixEnvironment set to:', isWixEnvironment);
 } catch (error) {
   console.error('[WixClient] ❌ Failed to create Wix client:', error);
-  console.error('[WixClient] ❌ Error details:', {
-    message: (error as Error)?.message,
-    stack: (error as Error)?.stack,
-  });
   isWixEnvironment = false;
 }
 
@@ -70,64 +42,29 @@ try {
 export const getWixClient = () => wixClient;
 
 /**
- * Get access token using the injector (for self-hosted apps)
- * This is the recommended way per Wix docs
+ * Get access token using the listener (for self-hosted apps)
+ * Note: Per Wix docs, the accessTokenListener is stored in the custom element constructor
+ * and fetchWithAuth should be used to make authenticated requests
  */
 export const getAccessToken = async (): Promise<string | null> => {
-  console.log('[WixAuth] 🔄 Getting access token...');
-
-  // Method 1: Use access token injector (preferred for self-hosted widgets)
-  if (accessTokenInjector) {
-    try {
-      console.log('[WixAuth] Using accessTokenInjector...');
-      const result = await accessTokenInjector();
-      console.log('[WixAuth] accessTokenInjector result:', result);
-      if (result?.accessToken) {
-        console.log('[WixAuth] ✅ Got access token from injector');
-        return result.accessToken;
-      }
-    } catch (error) {
-      console.error('[WixAuth] ❌ accessTokenInjector failed:', error);
-    }
-  }
-
-  // Method 2: Try wixClient.auth.getAccessToken
-  if (wixClient?.auth && typeof (wixClient.auth as any).getAccessToken === 'function') {
-    try {
-      console.log('[WixAuth] Using wixClient.auth.getAccessToken...');
-      const tokenData = await (wixClient.auth as any).getAccessToken();
-      console.log('[WixAuth] getAccessToken result:', tokenData);
-      if (tokenData?.accessToken) {
-        console.log('[WixAuth] ✅ Got access token from SDK');
-        return tokenData.accessToken;
-      }
-    } catch (error) {
-      console.error('[WixAuth] ❌ getAccessToken failed:', error);
-    }
-  }
-
-  console.log('[WixAuth] ⚠️ No access token available');
+  // The access token is handled internally by wixClient.fetchWithAuth
+  // We don't need to manually get it - just use fetchWithAuth
+  console.log('[WixAuth] Access token is managed by wixClient.fetchWithAuth');
   return null;
 };
+
+/**
+ * Get the access token listener (for storing in custom element)
+ */
+export const getAccessTokenListener = () => accessTokenListener;
 
 /**
  * Listen for postMessage from parent window (Wix sends data this way to custom elements in iframes)
  */
 if (typeof window !== 'undefined') {
-  // Log all incoming messages for debugging
   window.addEventListener('message', (event) => {
-    // Log all messages to help debug what Wix sends
-    console.log('[WixMessage] 📨 Received message from:', event.origin);
-    console.log('[WixMessage] 📨 Message data type:', typeof event.data);
-
     try {
       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-
-      // Log the full message structure for debugging
-      if (data && typeof data === 'object') {
-        console.log('[WixMessage] 📨 Message keys:', Object.keys(data));
-        console.log('[WixMessage] 📨 Full message:', JSON.stringify(data).substring(0, 500));
-      }
 
       // Check for compId in various message formats
       if (data?.compId && !compId) {
@@ -145,48 +82,23 @@ if (typeof window !== 'undefined') {
 
       // Wix custom element widget props
       if (data?.type === 'props' || data?.type === 'attributeChanged') {
-        console.log('[WixMessage] 📨 Props/attributeChanged message:', data);
         if (data.compId && !compId) {
           compId = data.compId;
-          console.log('[Wix] ✅ CompId from Wix message:', compId);
+          console.log('[Wix] ✅ CompId from Wix props message:', compId);
         }
       }
 
       // Wix TPA message format
       if (data?.intent === 'TPA2') {
-        console.log('[WixMessage] 📨 TPA2 message:', data);
         if (data.compId && !compId) {
           compId = data.compId;
           console.log('[Wix] ✅ CompId from TPA2:', compId);
         }
       }
-
-      // Wix custom element SDK channel messages
-      if (data?.type === 'wix-sdk') {
-        console.log('[WixMessage] 📨 Wix SDK message:', data);
-      }
-
-      // Check for Wix host channel data
-      if (data?.channel || data?.host) {
-        console.log('[WixMessage] 📨 Wix channel/host data:', data);
-      }
     } catch (e) {
-      // Not a JSON message, log raw data for debugging
-      if (event.data && typeof event.data === 'string' && event.data.length < 200) {
-        console.log('[WixMessage] 📨 Non-JSON message:', event.data);
-      }
+      // Not a JSON message, ignore
     }
   });
-
-  // Request compId from parent (Wix custom element communication)
-  if (window.parent !== window) {
-    try {
-      window.parent.postMessage({ type: 'getCompId', source: 'mapsy-widget' }, '*');
-      console.log('[WixMessage] 📤 Sent getCompId request to parent');
-    } catch (e) {
-      console.log('[WixMessage] ❌ Failed to send message to parent');
-    }
-  }
 }
 
 /**
@@ -232,7 +144,7 @@ const extractCompIdFromElement = (): string | null => {
 };
 
 /**
- * Extract instance from Wix's window globals
+ * Extract instance from Wix's window globals (fallback for legacy support)
  */
 const extractInstanceFromWixGlobals = (): { instance: string | null; compId: string | null } => {
   if (typeof window === 'undefined') return { instance: null, compId: null };
@@ -242,17 +154,7 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
 
   const win = window as any;
 
-  // Log all window properties that might contain Wix data
-  console.log('[WixGlobals] Checking window for Wix data...');
-  console.log('[WixGlobals] window.wixEmbedsAPI:', win.wixEmbedsAPI);
-  console.log('[WixGlobals] window.warmupData:', win.warmupData);
-  console.log('[WixGlobals] window.wixPerformanceMeasurements:', win.wixPerformanceMeasurements);
-  console.log('[WixGlobals] window.__EDITOR_DATA__:', win.__EDITOR_DATA__);
-  console.log('[WixGlobals] window.viewerModel:', win.viewerModel);
-  console.log('[WixGlobals] window.rendererModel:', win.rendererModel);
-  console.log('[WixGlobals] window.publicData:', win.publicData);
-
-  // Check wixEmbedsAPI (common way to get app token)
+  // Check wixEmbedsAPI
   if (win.wixEmbedsAPI?.getAppToken) {
     try {
       const token = win.wixEmbedsAPI.getAppToken();
@@ -260,57 +162,18 @@ const extractInstanceFromWixGlobals = (): { instance: string | null; compId: str
         instance = token;
         console.log('[Wix] ✅ Instance from wixEmbedsAPI');
       }
-    } catch (e) {
-      console.log('[WixGlobals] wixEmbedsAPI.getAppToken() failed:', e);
-    }
-  }
-
-  // Check wixEmbedsAPI for other useful methods
-  if (win.wixEmbedsAPI) {
-    console.log('[WixGlobals] wixEmbedsAPI methods:', Object.keys(win.wixEmbedsAPI));
-    if (win.wixEmbedsAPI.getExternalId) {
-      try {
-        const externalId = win.wixEmbedsAPI.getExternalId();
-        console.log('[WixGlobals] wixEmbedsAPI.getExternalId():', externalId);
-      } catch (e) { /* ignore */ }
-    }
-    if (win.wixEmbedsAPI.getInstanceId) {
-      try {
-        const instanceId = win.wixEmbedsAPI.getInstanceId();
-        console.log('[WixGlobals] wixEmbedsAPI.getInstanceId():', instanceId);
-        if (instanceId && !instance) {
-          instance = instanceId;
-        }
-      } catch (e) { /* ignore */ }
-    }
+    } catch (e) { /* ignore */ }
   }
 
   // Check warmupData
-  if (win.warmupData?.currentUrl?.query?.instance) {
+  if (win.warmupData?.currentUrl?.query?.instance && !instance) {
     instance = win.warmupData.currentUrl.query.instance;
     console.log('[Wix] ✅ Instance from warmupData');
   }
 
-  // Check for componentId
-  if (win.warmupData?.wixCodeModel?.componentId) {
+  if (win.warmupData?.wixCodeModel?.componentId && !extractedCompId) {
     extractedCompId = win.warmupData.wixCodeModel.componentId;
     console.log('[Wix] ✅ CompId from warmupData:', extractedCompId);
-  }
-
-  // Check viewerModel for instance data
-  if (win.viewerModel?.site?.instanceId) {
-    console.log('[WixGlobals] viewerModel.site.instanceId:', win.viewerModel.site.instanceId);
-    if (!instance) {
-      instance = win.viewerModel.site.instanceId;
-    }
-  }
-
-  // Check rendererModel
-  if (win.rendererModel?.siteInfo?.instanceId) {
-    console.log('[WixGlobals] rendererModel.siteInfo.instanceId:', win.rendererModel.siteInfo.instanceId);
-    if (!instance) {
-      instance = win.rendererModel.siteInfo.instanceId;
-    }
   }
 
   return { instance, compId: extractedCompId };
@@ -345,14 +208,19 @@ const extractInstanceFromUrl = (): string | null => {
 };
 
 /**
- * Initialize and retrieve Wix instance token and compId
+ * Initialize Wix data
+ * Per Wix docs for self-hosted Site Widget:
+ * - compId may be passed via URL or attributes
+ * - instanceId is extracted by the BACKEND from the access token sent via fetchWithAuth
+ * - We don't need to manually get the token on frontend
  */
 const initializeWixData = async (): Promise<void> => {
   console.log('[WixInit] 🔄 Starting initializeWixData...');
   console.log('[WixInit] 📍 Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
+  console.log('[WixInit] 🔐 Wix client available:', !!wixClient);
+  console.log('[WixInit] 🔐 Access token listener stored:', !!accessTokenListener);
 
-  // 1. Check URL parameters (compId is passed as URL param per Wix docs)
-  console.log('[WixInit] 1️⃣ Checking URL parameters...');
+  // 1. Check URL parameters (compId may be passed as URL param)
   const urlCompId = extractCompIdFromUrl();
   const urlInstance = extractInstanceFromUrl();
 
@@ -365,8 +233,7 @@ const initializeWixData = async (): Promise<void> => {
     console.log('[WixInit] ✅ Instance from URL');
   }
 
-  // 2. Check DOM elements
-  console.log('[WixInit] 2️⃣ Checking DOM elements...');
+  // 2. Check DOM elements for compId
   if (!compId) {
     const elementCompId = extractCompIdFromElement();
     if (elementCompId) {
@@ -374,8 +241,7 @@ const initializeWixData = async (): Promise<void> => {
     }
   }
 
-  // 3. Check Wix window globals
-  console.log('[WixInit] 3️⃣ Checking Wix window globals...');
+  // 3. Check Wix window globals (for fallback/legacy support)
   const wixGlobals = extractInstanceFromWixGlobals();
   if (!instanceToken && wixGlobals.instance) {
     instanceToken = wixGlobals.instance;
@@ -384,48 +250,14 @@ const initializeWixData = async (): Promise<void> => {
     compId = wixGlobals.compId;
   }
 
-  // 4. Try to get access token from Wix SDK (for self-hosted Site Widget)
-  console.log('[WixInit] 4️⃣ Getting access token from Wix SDK...');
-  if (isWixEnvironment && !instanceToken) {
-    const accessToken = await getAccessToken();
-    if (accessToken) {
-      instanceToken = accessToken;
-      console.log('[WixInit] ✅ Got instance token from Wix SDK');
-    }
-  }
-
-  // 5. Try legacy Wix.Utils API
-  console.log('[WixInit] 5️⃣ Trying legacy Wix.Utils API...');
-  try {
-    const wixContext = (window as any).Wix;
-    console.log('[WixInit] window.Wix:', wixContext);
-
-    if (wixContext?.Utils?.getCompId && !compId) {
-      const wixCompId = await wixContext.Utils.getCompId();
-      if (wixCompId) {
-        compId = wixCompId;
-        console.log('[WixInit] ✅ CompId from Wix.Utils:', compId);
-      }
-    }
-
-    if (wixContext?.Utils?.getInstance && !instanceToken) {
-      const wixInstance = wixContext.Utils.getInstance();
-      if (wixInstance) {
-        instanceToken = wixInstance;
-        console.log('[WixInit] ✅ Instance from Wix.Utils.getInstance');
-      }
-    }
-  } catch (error) {
-    console.log('[WixInit] Legacy Wix.Utils not available');
-  }
-
   // Final summary
   console.log('[WixInit] ========== SUMMARY ==========');
   console.log('[WixInit] compId:', compId);
-  console.log('[WixInit] instanceToken:', instanceToken ? `${instanceToken.substring(0, 30)}...` : null);
+  console.log('[WixInit] instanceToken (manual):', instanceToken ? 'present' : 'null (will use fetchWithAuth)');
   console.log('[WixInit] isWixEnvironment:', isWixEnvironment);
-  console.log('[WixInit] wixClient available:', !!wixClient);
+  console.log('[WixInit] wixClient.fetchWithAuth available:', !!wixClient?.fetchWithAuth);
   console.log('[WixInit] ==============================');
+  console.log('[WixInit] Note: Instance ID will be extracted by backend from access token');
 };
 
 /**

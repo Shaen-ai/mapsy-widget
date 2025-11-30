@@ -6,6 +6,7 @@ import apiService, {
   setInstanceToken,
   getWixClient,
   getAccessToken,
+  getAccessTokenListener,
   isInWixEnvironment
 } from './wixService';
 
@@ -20,6 +21,7 @@ export {
   setInstanceToken,
   getWixClient,
   getAccessToken,
+  getAccessTokenListener,
   isInWixEnvironment
 };
 
