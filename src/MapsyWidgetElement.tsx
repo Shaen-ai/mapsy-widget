@@ -26,6 +26,8 @@ class MapsyWidgetElement extends HTMLElement {
     headerTitle: 'Our Locations',
     mapZoomLevel: 12,
     primaryColor: '#3B82F6',
+    showWidgetName: false,
+    widgetName: '',
     apiUrl: 'https://mapsy-api.nextechspires.com/api'
   };
 
@@ -48,6 +50,8 @@ class MapsyWidgetElement extends HTMLElement {
       'header-title', 'headertitle',
       'map-zoom-level', 'mapzoomlevel',
       'primary-color', 'primarycolor',
+      'show-widget-name', 'showwidgetname',
+      'widget-name', 'widgetname',
       'api-url', 'compid', 'comp-id', 'instance', 'config'
     ];
   }
@@ -109,6 +113,14 @@ class MapsyWidgetElement extends HTMLElement {
       case 'primarycolor':
         this.config.primaryColor = newValue || '#3B82F6';
         break;
+      case 'show-widget-name':
+      case 'showwidgetname':
+        this.config.showWidgetName = newValue === 'true';
+        break;
+      case 'widget-name':
+      case 'widgetname':
+        this.config.widgetName = newValue || '';
+        break;
       case 'api-url':
         this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
         break;
@@ -143,6 +155,8 @@ class MapsyWidgetElement extends HTMLElement {
     const headerTitle = this.getAttribute('header-title');
     const mapZoomLevel = this.getAttribute('map-zoom-level');
     const primaryColor = this.getAttribute('primary-color');
+    const showWidgetName = this.getAttribute('show-widget-name');
+    const widgetName = this.getAttribute('widget-name');
     const apiUrl = this.getAttribute('api-url');
     const compIdAttr = this.getAttribute('compid') || this.getAttribute('comp-id');
     const instanceAttr = this.getAttribute('instance');
@@ -152,6 +166,8 @@ class MapsyWidgetElement extends HTMLElement {
     if (headerTitle) this.config.headerTitle = headerTitle;
     if (mapZoomLevel) this.config.mapZoomLevel = parseInt(mapZoomLevel, 10);
     if (primaryColor) this.config.primaryColor = primaryColor;
+    if (showWidgetName !== null) this.config.showWidgetName = showWidgetName === 'true';
+    if (widgetName) this.config.widgetName = widgetName;
     if (apiUrl) this.config.apiUrl = apiUrl;
 
     // Set Wix-specific attributes in the service

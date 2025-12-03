@@ -11,6 +11,8 @@ interface WidgetConfig {
   headerTitle?: string;
   mapZoomLevel?: number;
   primaryColor?: string;
+  showWidgetName?: boolean;
+  widgetName?: string;
 }
 
 interface AppProps {
@@ -31,6 +33,8 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     headerTitle: 'Our Locations',
     mapZoomLevel: 12,
     primaryColor: '#3B82F6',
+    showWidgetName: false,
+    widgetName: '',
     ...externalConfig,
   });
 
@@ -103,6 +107,14 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      {/* Widget Name Display */}
+      {config.showWidgetName && config.widgetName && (
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2">
+          <h1 className="text-white font-semibold text-center">
+            {config.widgetName}
+          </h1>
+        </div>
+      )}
 
       {config.showHeader && (
         <div className="bg-white shadow-sm border-b border-gray-200">
