@@ -5,7 +5,9 @@ import {
   setCompId,
   setInstanceToken,
   getWixClient,
-  getAccessTokenListener
+  getAccessTokenListener,
+  isInEditorMode,
+  premiumService
 } from './services/api';
 
 /**
@@ -69,6 +71,16 @@ class MapsyWidgetElement extends HTMLElement {
 
     try {
       this.updateConfigFromAttributes();
+
+      // Check if we should show the widget
+      const shouldShow = await this.checkShouldShowWidget();
+      if (!shouldShow) {
+        console.log('[Widget] Hiding widget - no premium on published site');
+        this.hideWidget();
+        this._initialized = true;
+        return;
+      }
+
       this.mountReactApp();
       this._initialized = true;
     } catch (error) {
@@ -80,6 +92,51 @@ class MapsyWidgetElement extends HTMLElement {
         console.error('[Widget] Failed to mount:', mountError);
       }
     }
+  }
+
+  /**
+   * Check if the widget should be shown
+   * Always show in editor mode, check premium for published sites
+   */
+  private async checkShouldShowWidget(): Promise<boolean> {
+    // Always show in editor mode
+    if (isInEditorMode()) {
+      console.log('[Widget] Editor mode detected - showing widget');
+      return true;
+    }
+
+    // Check premium status for published sites
+    try {
+      console.log('[Widget] Published site detected - checking premium status');
+      const premiumStatus = await premiumService.checkPremium();
+      console.log('[Widget] Premium status:', premiumStatus);
+
+      if (premiumStatus.hasPremium) {
+        console.log('[Widget] User has premium - showing widget');
+        return true;
+      } else {
+        console.log('[Widget] User does not have premium - hiding widget');
+        return false;
+      }
+    } catch (error) {
+      // If we can't check premium, show the widget (fail open)
+      console.error('[Widget] Error checking premium status:', error);
+      console.log('[Widget] Falling back to showing widget');
+      return true;
+    }
+  }
+
+  /**
+   * Hide the widget completely
+   */
+  private hideWidget(): void {
+    if (this.shadowRoot) {
+      this.shadowRoot.innerHTML = '';
+      const style = document.createElement('style');
+      style.textContent = ':host { display: none !important; }';
+      this.shadowRoot.appendChild(style);
+    }
+    this.style.display = 'none';
   }
 
   disconnectedCallback() {

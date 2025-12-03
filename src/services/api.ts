@@ -7,7 +7,8 @@ import apiService, {
   getWixClient,
   getAccessToken,
   getAccessTokenListener,
-  isInWixEnvironment
+  isInWixEnvironment,
+  isInEditorMode
 } from './wixService';
 
 // Backend API URL
@@ -22,7 +23,8 @@ export {
   getWixClient,
   getAccessToken,
   getAccessTokenListener,
-  isInWixEnvironment
+  isInWixEnvironment,
+  isInEditorMode
 };
 
 // Initialize API
@@ -53,6 +55,25 @@ export const widgetConfigService = {
     const response = await fetchApi('/widget-config', { method: 'GET' });
     if (!response.ok) {
       throw new Error(`Failed to fetch config: ${response.statusText}`);
+    }
+    return response.json();
+  },
+};
+
+// Premium status service
+export interface PremiumStatus {
+  hasPremium: boolean;
+  vendorProductId: string | null;
+  instanceId: string | null;
+}
+
+export const premiumService = {
+  checkPremium: async (): Promise<PremiumStatus> => {
+    const response = await fetchApi('/premium-status', { method: 'GET' });
+    if (!response.ok) {
+      // If we can't check premium, assume premium (fail open for better UX)
+      console.warn('[PremiumService] Failed to check premium status, assuming premium');
+      return { hasPremium: true, vendorProductId: null, instanceId: null };
     }
     return response.json();
   },

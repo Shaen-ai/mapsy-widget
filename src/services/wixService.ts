@@ -298,6 +298,61 @@ export const isInWixEnvironment = (): boolean => {
 };
 
 /**
+ * Check if we're in the editor (not a published site)
+ * In the editor, we always show the widget regardless of premium status
+ */
+export const isInEditorMode = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  // Check URL patterns that indicate editor mode
+  const url = window.location.href.toLowerCase();
+
+  // Editor URLs typically contain these patterns
+  const editorPatterns = [
+    'editor.wix.com',
+    'editor-elements-registry',
+    '/editor/',
+    'wixsite.com/_preview',
+    'editorx.com',
+    'wixstudio.com',
+    '/edit',
+    'preview=true',
+    'viewMode=editor'
+  ];
+
+  for (const pattern of editorPatterns) {
+    if (url.includes(pattern)) {
+      console.log('[Wix] Detected editor mode via URL pattern:', pattern);
+      return true;
+    }
+  }
+
+  // Check Wix window globals
+  const win = window as any;
+
+  // Check for editor-specific globals
+  if (win.Wix?.Utils?.getViewMode?.() !== 'Site') {
+    console.log('[Wix] Detected non-site mode via Wix.Utils.getViewMode');
+    return true;
+  }
+
+  // Check for editor mode in warmupData
+  if (win.warmupData?.viewMode && win.warmupData.viewMode !== 'site') {
+    console.log('[Wix] Detected editor mode via warmupData.viewMode');
+    return true;
+  }
+
+  // Check for rendering context
+  if (win.renderingContext?.viewMode && win.renderingContext.viewMode !== 'SITE') {
+    console.log('[Wix] Detected editor mode via renderingContext');
+    return true;
+  }
+
+  // Default: assume published site
+  return false;
+};
+
+/**
  * Fetch with Wix authentication
  * Per Wix docs: Use wixClient.fetchWithAuth() to send the access token to your backend
  * The backend can then extract instanceId from the token via Wix API
