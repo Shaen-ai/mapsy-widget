@@ -203,10 +203,10 @@ class MapsyWidgetElement extends HTMLElement {
       `;
       this.shadowRoot.appendChild(style);
 
-      // Add link to Tailwind CSS (or your compiled CSS)
+      // Add link to widget's compiled CSS from the CDN
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = '/src/index.css'; // Adjust path as needed
+      link.href = 'https://mapsy-widget.nextechspires.com/style.css';
       this.shadowRoot.appendChild(link);
 
       this.shadowRoot.appendChild(container);
