@@ -10,6 +10,7 @@ export interface BusinessHours {
 
 export interface Location {
   id?: number;
+  _id?: string;
   name: string;
   address: string;
   phone?: string;

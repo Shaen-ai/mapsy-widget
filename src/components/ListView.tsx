@@ -42,12 +42,12 @@ const ListView: React.FC<ListViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {locations.map((location) => (
             <div
-              key={location.id}
+              key={location._id || location.id}
               className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
-                selectedLocation?.id === location.id ? 'ring-2' : ''
+                (selectedLocation?._id || selectedLocation?.id) === (location._id || location.id) ? 'ring-2' : ''
               }`}
               style={
-                selectedLocation?.id === location.id
+                (selectedLocation?._id || selectedLocation?.id) === (location._id || location.id)
                   ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` }
                   : {}
               }

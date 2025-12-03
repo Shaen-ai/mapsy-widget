@@ -84,7 +84,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
     // If in map view, find and trigger click on the corresponding marker
     if (currentView === 'map') {
-      const markerIndex = locations.findIndex(loc => loc.id === location.id);
+      const markerIndex = locations.findIndex(loc => (loc._id || loc.id) === (location._id || location.id));
       if (markerIndex !== -1 && markers[markerIndex]) {
         google.maps.event.trigger(markers[markerIndex], 'click');
       }
