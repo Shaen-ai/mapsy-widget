@@ -3,7 +3,7 @@ import MapView from './components/MapView';
 import ListView from './components/ListView';
 import PremiumBanner from './components/PremiumBanner';
 import { Location } from './types/location';
-import { locationService, widgetConfigService, initializeApi } from './services/api';
+import { locationService, widgetConfigService, initializeApi, isInEditorMode } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
 
 interface WidgetConfig {
@@ -14,21 +14,23 @@ interface WidgetConfig {
   primaryColor?: string;
   showWidgetName?: boolean;
   widgetName?: string;
+  hasPremium?: boolean;
 }
 
 interface AppProps {
   apiUrl?: string;
   config?: Partial<WidgetConfig>;
-  showPremiumWarning?: boolean;
 }
 
-function App({ apiUrl, config: externalConfig, showPremiumWarning = false }: AppProps = {}) {
+function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
   const [currentView, setCurrentView] = useState<'map' | 'list'>('map');
+  const [showPremiumWarning, setShowPremiumWarning] = useState(false);
+  const [shouldHideWidget, setShouldHideWidget] = useState(false);
   const [config, setConfig] = useState<WidgetConfig>({
     defaultView: 'map',
     showHeader: false, // Hide header by default
@@ -63,6 +65,21 @@ function App({ apiUrl, config: externalConfig, showPremiumWarning = false }: App
       const mergedConfig = { ...configData, ...externalConfig };
       setConfig(mergedConfig);
       setCurrentView(mergedConfig.defaultView || 'map');
+
+      // Handle premium status from config response
+      const inEditor = isInEditorMode();
+      const hasPremium = configData.hasPremium === true;
+
+      if (!hasPremium) {
+        if (inEditor) {
+          // In editor/preview: show widget with warning banner
+          setShowPremiumWarning(true);
+        } else {
+          // On published site: hide widget
+          console.log('[Widget] No premium on published site - hiding widget');
+          setShouldHideWidget(true);
+        }
+      }
     } catch (error) {
       console.error('[Config] ❌', (error as Error)?.message);
       setCurrentView(config.defaultView || 'map');
@@ -98,6 +115,11 @@ function App({ apiUrl, config: externalConfig, showPremiumWarning = false }: App
       }
     }
   };
+
+  // Hide widget on published site without premium
+  if (shouldHideWidget) {
+    return null;
+  }
 
   if (loading) {
     return (

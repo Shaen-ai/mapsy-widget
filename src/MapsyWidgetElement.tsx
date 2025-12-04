@@ -5,9 +5,7 @@ import {
   setCompId,
   setInstanceToken,
   getWixClient,
-  getAccessTokenListener,
-  isInEditorMode,
-  premiumService
+  getAccessTokenListener
 } from './services/api';
 
 /**
@@ -22,8 +20,6 @@ class MapsyWidgetElement extends HTMLElement {
   public _initialized: boolean = false;
   // Store access token listener as per Wix example
   private accessTokenListener: any = null;
-  // Whether to show premium warning (free user in editor/preview)
-  private showPremiumWarning: boolean = false;
   private config = {
     defaultView: 'map' as 'map' | 'list',
     showHeader: false,
@@ -74,73 +70,10 @@ class MapsyWidgetElement extends HTMLElement {
 
     try {
       this.updateConfigFromAttributes();
-
-      // Mount React app immediately for fast first render
       this.mountReactApp();
-
-      // Check premium status asynchronously after mount
-      this.checkAndHandlePremiumStatus();
     } catch (error) {
       console.error('[Widget] Mount error:', error);
     }
-  }
-
-  /**
-   * Check premium status asynchronously and handle visibility
-   * This runs after the widget is already mounted for fast first render
-   *
-   * In editor mode: ALWAYS show widget, just toggle the warning banner
-   * In published site: Hide widget if no premium
-   */
-  private async checkAndHandlePremiumStatus(): Promise<void> {
-    const inEditorOrPreview = isInEditorMode();
-
-    // In editor mode, always keep widget visible - just check for warning banner
-    if (inEditorOrPreview) {
-      try {
-        const premiumStatus = await premiumService.checkPremium();
-        const showWarning = !premiumStatus.hasPremium;
-
-        if (showWarning !== this.showPremiumWarning) {
-          this.showPremiumWarning = showWarning;
-          this.mountReactApp(); // Re-render with updated warning state
-        }
-      } catch (error) {
-        // In editor, if premium check fails, show warning to be safe
-        console.log('[Widget] Premium check failed in editor, showing warning');
-        if (!this.showPremiumWarning) {
-          this.showPremiumWarning = true;
-          this.mountReactApp();
-        }
-      }
-      return;
-    }
-
-    // Published site: check if we should hide
-    try {
-      const premiumStatus = await premiumService.checkPremium();
-
-      if (!premiumStatus.hasPremium) {
-        console.log('[Widget] Hiding widget - no premium on published site');
-        this.hideWidget();
-      }
-    } catch (error) {
-      console.error('[Widget] Error checking premium status:', error);
-      // Keep widget visible on error (fail open)
-    }
-  }
-
-  /**
-   * Hide the widget completely
-   */
-  private hideWidget(): void {
-    if (this.shadowRoot) {
-      this.shadowRoot.innerHTML = '';
-      const style = document.createElement('style');
-      style.textContent = ':host { display: none !important; }';
-      this.shadowRoot.appendChild(style);
-    }
-    this.style.display = 'none';
   }
 
   disconnectedCallback() {
@@ -283,7 +216,6 @@ class MapsyWidgetElement extends HTMLElement {
         <App
           apiUrl={this.config.apiUrl}
           config={this.config}
-          showPremiumWarning={this.showPremiumWarning}
         />
       </React.StrictMode>
     );
