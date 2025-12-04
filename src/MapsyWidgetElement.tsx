@@ -22,6 +22,8 @@ class MapsyWidgetElement extends HTMLElement {
   public _initialized: boolean = false;
   // Store access token listener as per Wix example
   private accessTokenListener: any = null;
+  // Whether to show premium warning (free user in editor/preview)
+  private showPremiumWarning: boolean = false;
   private config = {
     defaultView: 'map' as 'map' | 'list',
     showHeader: false,
@@ -72,8 +74,10 @@ class MapsyWidgetElement extends HTMLElement {
     try {
       this.updateConfigFromAttributes();
 
-      // Check if we should show the widget
-      const shouldShow = await this.checkShouldShowWidget();
+      // Check if we should show the widget and whether to show warning
+      const { shouldShow, showWarning } = await this.checkShouldShowWidget();
+      this.showPremiumWarning = showWarning;
+
       if (!shouldShow) {
         console.log('[Widget] Hiding widget - no premium on published site');
         this.hideWidget();
@@ -95,34 +99,41 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   /**
-   * Check if the widget should be shown
-   * Always show in editor mode, check premium for published sites
+   * Check if the widget should be shown and whether to display premium warning
+   * - Editor/Preview mode: Always show widget, but show warning if user is on free plan
+   * - Published site: Hide widget if user is on free plan
+   * Returns: { shouldShow: boolean, showWarning: boolean }
    */
-  private async checkShouldShowWidget(): Promise<boolean> {
-    // Always show in editor mode
-    if (isInEditorMode()) {
-      console.log('[Widget] Editor mode detected - showing widget');
-      return true;
-    }
+  private async checkShouldShowWidget(): Promise<{ shouldShow: boolean; showWarning: boolean }> {
+    const inEditorOrPreview = isInEditorMode();
 
-    // Check premium status for published sites
+    // Check premium status
     try {
-      console.log('[Widget] Published site detected - checking premium status');
+      console.log('[Widget] Checking premium status...');
       const premiumStatus = await premiumService.checkPremium();
       console.log('[Widget] Premium status:', premiumStatus);
 
       if (premiumStatus.hasPremium) {
+        // Premium user - show widget everywhere, no warning
         console.log('[Widget] User has premium - showing widget');
-        return true;
+        return { shouldShow: true, showWarning: false };
       } else {
-        console.log('[Widget] User does not have premium - hiding widget');
-        return false;
+        // Free user
+        if (inEditorOrPreview) {
+          // In editor/preview - show widget with warning
+          console.log('[Widget] Free user in editor/preview - showing widget with warning');
+          return { shouldShow: true, showWarning: true };
+        } else {
+          // On published site - hide widget
+          console.log('[Widget] Free user on published site - hiding widget');
+          return { shouldShow: false, showWarning: false };
+        }
       }
     } catch (error) {
-      // If we can't check premium, show the widget (fail open)
+      // If we can't check premium, assume premium (fail open)
       console.error('[Widget] Error checking premium status:', error);
-      console.log('[Widget] Falling back to showing widget');
-      return true;
+      console.log('[Widget] Falling back to showing widget without warning');
+      return { shouldShow: true, showWarning: false };
     }
   }
 
@@ -279,6 +290,7 @@ class MapsyWidgetElement extends HTMLElement {
         <App
           apiUrl={this.config.apiUrl}
           config={this.config}
+          showPremiumWarning={this.showPremiumWarning}
         />
       </React.StrictMode>
     );

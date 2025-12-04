@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
+import PremiumBanner from './components/PremiumBanner';
 import { Location } from './types/location';
 import { locationService, widgetConfigService, initializeApi } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
@@ -18,9 +19,10 @@ interface WidgetConfig {
 interface AppProps {
   apiUrl?: string;
   config?: Partial<WidgetConfig>;
+  showPremiumWarning?: boolean;
 }
 
-function App({ apiUrl, config: externalConfig }: AppProps = {}) {
+function App({ apiUrl, config: externalConfig, showPremiumWarning = false }: AppProps = {}) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,10 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50" style={{ position: 'relative' }}>
+      {/* Premium Warning Banner for Free Users in Editor/Preview */}
+      {showPremiumWarning && <PremiumBanner />}
+
       {/* Widget Name Display */}
       {config.showWidgetName && config.widgetName && (
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2">
