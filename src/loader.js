@@ -75,7 +75,9 @@
   function loadScript(src, onLoad, onError) {
     const script = document.createElement('script');
     script.type = 'text/javascript';
-    script.async = true;
+    // Don't use async - we want the script to execute as soon as it loads
+    // to register the custom element before Wix tries to use it
+    script.async = false;
     script.src = src;
     script.onload = onLoad;
     script.onerror = onError;
@@ -168,12 +170,9 @@
     });
   }
 
-  // Start loading
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadWidget);
-  } else {
-    loadWidget();
-  }
+  // Start loading IMMEDIATELY - don't wait for DOMContentLoaded
+  // This ensures the custom element is registered before Wix tries to use it
+  loadWidget();
 
   // Expose loader API
   window.MapsyWidgetLoader = {
