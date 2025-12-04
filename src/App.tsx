@@ -58,6 +58,16 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     initializeWidget();
   }, [apiUrl]);
 
+  // Apply external config changes without re-fetching from API
+  useEffect(() => {
+    if (externalConfig) {
+      setConfig(prev => ({ ...prev, ...externalConfig }));
+      if (externalConfig.defaultView) {
+        setCurrentView(externalConfig.defaultView);
+      }
+    }
+  }, [externalConfig]);
+
   const fetchConfig = async () => {
     try {
       const configData = await widgetConfigService.getConfig();
@@ -65,7 +75,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
       setConfig(mergedConfig);
       setCurrentView(mergedConfig.defaultView || 'map');
 
-      // Check premium status
+      // Check premium status - only on initial load (not on config updates from settings)
       const inEditor = isInEditorMode();
       const hasPremium = configData.hasPremium === true;
 

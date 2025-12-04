@@ -17,6 +17,7 @@ import {
  */
 class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
+  private container: HTMLDivElement | null = null;
   public _initialized: boolean = false;
   // Store access token listener as per Wix example
   private accessTokenListener: any = null;
@@ -174,14 +175,12 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   private mountReactApp() {
-    // Create container for React app
-    const container = document.createElement('div');
-    container.style.width = '100%';
-    container.style.height = '100%';
-
-    // Clear shadow DOM and add container
-    if (this.shadowRoot) {
-      this.shadowRoot.innerHTML = '';
+    // Only set up shadow DOM once
+    if (!this.container && this.shadowRoot) {
+      // Create container for React app
+      this.container = document.createElement('div');
+      this.container.style.width = '100%';
+      this.container.style.height = '100%';
 
       // Add styles to shadow DOM
       const style = document.createElement('style');
@@ -203,22 +202,23 @@ class MapsyWidgetElement extends HTMLElement {
       link.href = 'https://mapsy-widget.nextechspires.com/style.css';
       this.shadowRoot.appendChild(link);
 
-      this.shadowRoot.appendChild(container);
+      this.shadowRoot.appendChild(this.container);
+
+      // Create React root once
+      this.root = ReactDOM.createRoot(this.container);
     }
 
-    // Mount or update React app
-    if (!this.root) {
-      this.root = ReactDOM.createRoot(container);
+    // Render/update React app
+    if (this.root) {
+      this.root.render(
+        <React.StrictMode>
+          <App
+            apiUrl={this.config.apiUrl}
+            config={this.config}
+          />
+        </React.StrictMode>
+      );
     }
-
-    this.root.render(
-      <React.StrictMode>
-        <App
-          apiUrl={this.config.apiUrl}
-          config={this.config}
-        />
-      </React.StrictMode>
-    );
   }
 
   public setProp(property: string, value: any) {
