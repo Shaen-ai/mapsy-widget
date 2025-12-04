@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
-import PremiumBanner from './components/PremiumBanner';
 import { Location } from './types/location';
 import { locationService, widgetConfigService, initializeApi, isInEditorMode } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
@@ -29,7 +28,6 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
   const [currentView, setCurrentView] = useState<'map' | 'list'>('map');
-  const [showPremiumWarning, setShowPremiumWarning] = useState(false);
   const [shouldHideWidget, setShouldHideWidget] = useState(false);
   const [config, setConfig] = useState<WidgetConfig>({
     defaultView: 'map',
@@ -66,16 +64,12 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
       setConfig(mergedConfig);
       setCurrentView(mergedConfig.defaultView || 'map');
 
-      // Handle premium status from config response
+      // Only hide widget on published site without premium
+      // In editor/preview mode - always show widget
       const inEditor = isInEditorMode();
-      const hasPremium = configData.hasPremium === true;
-
-      if (!hasPremium) {
-        if (inEditor) {
-          // In editor/preview: show widget with warning banner
-          setShowPremiumWarning(true);
-        } else {
-          // On published site: hide widget
+      if (!inEditor) {
+        const hasPremium = configData.hasPremium === true;
+        if (!hasPremium) {
           console.log('[Widget] No premium on published site - hiding widget');
           setShouldHideWidget(true);
         }
@@ -132,7 +126,6 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   return (
     <div className="h-screen flex flex-col bg-gray-50" style={{ position: 'relative' }}>
       {/* Premium Warning Banner for Free Users in Editor/Preview */}
-      {showPremiumWarning && <PremiumBanner />}
 
       {/* Widget Name Display */}
       {config.showWidgetName && config.widgetName && (
