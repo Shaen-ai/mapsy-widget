@@ -60,8 +60,9 @@ class MapsyWidgetElement extends HTMLElement {
     ];
   }
 
-  async connectedCallback() {
+  connectedCallback() {
     if (this._initialized) return;
+    this._initialized = true;
 
     // Debug: Log all attributes on the element
     const attrs: string[] = [];
@@ -74,27 +75,38 @@ class MapsyWidgetElement extends HTMLElement {
     try {
       this.updateConfigFromAttributes();
 
-      // Check if we should show the widget and whether to show warning
+      // Mount React app immediately for fast first render
+      this.mountReactApp();
+
+      // Check premium status asynchronously after mount
+      this.checkAndHandlePremiumStatus();
+    } catch (error) {
+      console.error('[Widget] Mount error:', error);
+    }
+  }
+
+  /**
+   * Check premium status asynchronously and handle visibility
+   * This runs after the widget is already mounted for fast first render
+   */
+  private async checkAndHandlePremiumStatus(): Promise<void> {
+    try {
       const { shouldShow, showWarning } = await this.checkShouldShowWidget();
-      this.showPremiumWarning = showWarning;
 
       if (!shouldShow) {
         console.log('[Widget] Hiding widget - no premium on published site');
         this.hideWidget();
-        this._initialized = true;
         return;
       }
 
-      this.mountReactApp();
-      this._initialized = true;
-    } catch (error) {
-      console.error('[Widget] Mount error:', error);
-      try {
-        this.mountReactApp();
-        this._initialized = true;
-      } catch (mountError) {
-        console.error('[Widget] Failed to mount:', mountError);
+      // Update premium warning state if needed
+      if (showWarning !== this.showPremiumWarning) {
+        this.showPremiumWarning = showWarning;
+        this.mountReactApp(); // Re-render with updated warning state
       }
+    } catch (error) {
+      console.error('[Widget] Error checking premium status:', error);
+      // Keep widget visible on error (fail open)
     }
   }
 
@@ -310,14 +322,12 @@ class MapsyWidgetElement extends HTMLElement {
 if (!customElements.get('mapsy-widget')) {
   customElements.define('mapsy-widget', MapsyWidgetElement);
 
-  // Manually upgrade any existing elements
-  setTimeout(() => {
-    document.querySelectorAll('mapsy-widget').forEach((widget) => {
-      if (widget instanceof MapsyWidgetElement && !widget._initialized) {
-        widget.connectedCallback().catch(console.error);
-      }
-    });
-  }, 100);
+  // Manually upgrade any existing elements that were in DOM before registration
+  document.querySelectorAll('mapsy-widget').forEach((widget) => {
+    if (widget instanceof MapsyWidgetElement && !widget._initialized) {
+      widget.connectedCallback();
+    }
+  });
 }
 
 export default MapsyWidgetElement;
