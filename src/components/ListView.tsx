@@ -38,19 +38,18 @@ const ListView: React.FC<ListViewProps> = ({
 
   return (
     <div className="h-full overflow-y-auto bg-white">
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="py-6" style={{ paddingLeft: '4%', paddingRight: '4%' }}>
+        <div className="flex flex-col gap-4">
           {locations.map((location) => (
             <div
               key={location._id || location.id}
-              className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
-                (selectedLocation?._id || selectedLocation?.id) === (location._id || location.id) ? 'ring-2' : ''
-              }`}
-              style={
-                (selectedLocation?._id || selectedLocation?.id) === (location._id || location.id)
-                  ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` }
-                  : {}
-              }
+              className={`bg-white overflow-hidden cursor-pointer transition-all hover:bg-gray-50`}
+              style={{
+                width: '100%',
+                border: (selectedLocation?._id || selectedLocation?.id) === (location._id || location.id)
+                  ? `2px solid ${primaryColor}`
+                  : '1px solid #000',
+              }}
               onClick={() => onLocationSelect(location)}
             >
               {location.image_url && (
@@ -70,15 +69,15 @@ const ListView: React.FC<ListViewProps> = ({
                       {location.name}
                     </h3>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
+                      <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-700">
                         {location.category}
                       </span>
                       {isOpenNow(location) ? (
-                        <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                        <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800">
                           Open Now
                         </span>
                       ) : (
-                        <span className="inline-block px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                        <span className="inline-block px-2 py-1 text-xs bg-red-100 text-red-800">
                           Closed
                         </span>
                       )}
@@ -142,15 +141,15 @@ const ListView: React.FC<ListViewProps> = ({
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t flex gap-2">
+                <div className="mt-4 pt-4 border-t border-black flex gap-2">
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
                       location.address
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 px-3 py-2 text-white text-sm rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition"
-                    style={{ backgroundColor: primaryColor }}
+                    className="flex-1 px-3 py-2 text-white text-sm flex items-center justify-center gap-2 hover:opacity-90 transition"
+                    style={{ backgroundColor: '#000', border: '1px solid #000' }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <FiNavigation size={16} />
@@ -160,8 +159,8 @@ const ListView: React.FC<ListViewProps> = ({
                   {location.phone && (
                     <a
                       href={`tel:${location.phone}`}
-                      className="flex-1 px-3 py-2 border text-gray-700 text-sm rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition"
-                      style={{ borderColor: primaryColor, color: primaryColor }}
+                      className="flex-1 px-3 py-2 text-sm flex items-center justify-center gap-2 hover:bg-gray-100 transition"
+                      style={{ border: '1px solid #000', color: '#000' }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <FiPhone size={16} />
