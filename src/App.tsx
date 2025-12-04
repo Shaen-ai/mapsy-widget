@@ -29,6 +29,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
   const [currentView, setCurrentView] = useState<'map' | 'list'>('map');
   const [shouldHideWidget, setShouldHideWidget] = useState(false);
+  const [showFreePlanNotice, setShowFreePlanNotice] = useState(false);
   const [config, setConfig] = useState<WidgetConfig>({
     defaultView: 'map',
     showHeader: false, // Hide header by default
@@ -64,12 +65,18 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
       setConfig(mergedConfig);
       setCurrentView(mergedConfig.defaultView || 'map');
 
-      // Only hide widget on published site without premium
-      // In editor/preview mode - always show widget
+      // Check premium status
       const inEditor = isInEditorMode();
-      if (!inEditor) {
-        const hasPremium = configData.hasPremium === true;
-        if (!hasPremium) {
+      const hasPremium = configData.hasPremium === true;
+
+      if (!hasPremium) {
+        if (inEditor) {
+          // In editor/preview: show notice that widget won't appear on published site
+          setShowFreePlanNotice(true);
+          // Auto-hide after 5 seconds
+          setTimeout(() => setShowFreePlanNotice(false), 5000);
+        } else {
+          // On published site: hide widget
           console.log('[Widget] No premium on published site - hiding widget');
           setShouldHideWidget(true);
         }
@@ -125,7 +132,27 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50" style={{ position: 'relative' }}>
-      {/* Premium Warning Banner for Free Users in Editor/Preview */}
+      {/* Free Plan Notice - shown in editor for users without premium */}
+      {showFreePlanNotice && (
+        <div
+          onClick={() => setShowFreePlanNotice(false)}
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 cursor-pointer"
+        >
+          <div className="bg-white rounded-xl shadow-2xl p-8 mx-4 max-w-md text-center">
+            <div className="text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">
+              Free Plan Notice
+            </h2>
+            <p className="text-gray-600 mb-4">
+              This widget will <strong>not be visible</strong> on your published site.
+              Upgrade to a premium plan to show it to your visitors.
+            </p>
+            <p className="text-sm text-gray-400">
+              Click anywhere to dismiss
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Widget Name Display */}
       {config.showWidgetName && config.widgetName && (
