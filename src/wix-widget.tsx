@@ -7,7 +7,7 @@ import { setCompId, setInstanceToken, getCompId, getInstanceToken } from './serv
  * This file is loaded by Wix and registers the custom element
  */
 
-// Extract compId and instance from URL params
+// Extract compId and instance from URL params (run immediately)
 function extractWixParams() {
   const urlParams = new URLSearchParams(window.location.search);
 
@@ -27,18 +27,18 @@ function extractWixParams() {
   return { compId, instance };
 }
 
+// Extract params immediately (before DOM ready)
+const wixParams = extractWixParams();
+
 // Initialize the widget when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeWidget);
+  document.addEventListener('DOMContentLoaded', () => initializeWidget(wixParams));
 } else {
-  initializeWidget();
+  initializeWidget(wixParams);
 }
 
-function initializeWidget() {
+function initializeWidget({ compId, instance }: { compId: string | null; instance: string | null }) {
   console.log('Mapsy Widget initialized for Wix');
-
-  // Extract Wix params from URL
-  const { compId, instance } = extractWixParams();
 
   // Check if we're in Wix environment
   if (window.parent !== window) {
@@ -82,17 +82,24 @@ function initializeWidget() {
 // Export for Wix to access
 (window as any).MapsyWidget = {
   setProp: (property: string, value: any) => {
-    const widget = document.querySelector('mapsy-widget') as any;
-    if (widget && widget.setProp) {
-      widget.setProp(property, value);
-    }
-    // Also handle compId and instance specially
+    // Store property values even if widget isn't ready yet
     if (property === 'compId' || property === 'compid') {
       setCompId(String(value));
     }
     if (property === 'instance') {
       setInstanceToken(String(value));
     }
+
+    // Try to set on widget if it exists
+    const widget = document.querySelector('mapsy-widget') as any;
+    if (widget && widget.setProp) {
+      widget.setProp(property, value);
+    } else if (widget) {
+      // Widget exists but setProp not available - set as attribute
+      const attrName = property.replace(/([A-Z])/g, '-$1').toLowerCase();
+      widget.setAttribute(attrName, String(value));
+    }
+    // If widget doesn't exist yet, values are stored in service and will be used when widget initializes
   },
   getConfig: () => {
     const widget = document.querySelector('mapsy-widget') as any;
