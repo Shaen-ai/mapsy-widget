@@ -88,64 +88,45 @@ class MapsyWidgetElement extends HTMLElement {
   /**
    * Check premium status asynchronously and handle visibility
    * This runs after the widget is already mounted for fast first render
+   *
+   * In editor mode: ALWAYS show widget, just toggle the warning banner
+   * In published site: Hide widget if no premium
    */
   private async checkAndHandlePremiumStatus(): Promise<void> {
-    try {
-      const { shouldShow, showWarning } = await this.checkShouldShowWidget();
+    const inEditorOrPreview = isInEditorMode();
 
-      if (!shouldShow) {
+    // In editor mode, always keep widget visible - just check for warning banner
+    if (inEditorOrPreview) {
+      try {
+        const premiumStatus = await premiumService.checkPremium();
+        const showWarning = !premiumStatus.hasPremium;
+
+        if (showWarning !== this.showPremiumWarning) {
+          this.showPremiumWarning = showWarning;
+          this.mountReactApp(); // Re-render with updated warning state
+        }
+      } catch (error) {
+        // In editor, if premium check fails, show warning to be safe
+        console.log('[Widget] Premium check failed in editor, showing warning');
+        if (!this.showPremiumWarning) {
+          this.showPremiumWarning = true;
+          this.mountReactApp();
+        }
+      }
+      return;
+    }
+
+    // Published site: check if we should hide
+    try {
+      const premiumStatus = await premiumService.checkPremium();
+
+      if (!premiumStatus.hasPremium) {
         console.log('[Widget] Hiding widget - no premium on published site');
         this.hideWidget();
-        return;
-      }
-
-      // Update premium warning state if needed
-      if (showWarning !== this.showPremiumWarning) {
-        this.showPremiumWarning = showWarning;
-        this.mountReactApp(); // Re-render with updated warning state
       }
     } catch (error) {
       console.error('[Widget] Error checking premium status:', error);
       // Keep widget visible on error (fail open)
-    }
-  }
-
-  /**
-   * Check if the widget should be shown and whether to display premium warning
-   * - Editor/Preview mode: Always show widget, but show warning if user is on free plan
-   * - Published site: Hide widget if user is on free plan
-   * Returns: { shouldShow: boolean, showWarning: boolean }
-   */
-  private async checkShouldShowWidget(): Promise<{ shouldShow: boolean; showWarning: boolean }> {
-    const inEditorOrPreview = isInEditorMode();
-
-    // Check premium status
-    try {
-      console.log('[Widget] Checking premium status...');
-      const premiumStatus = await premiumService.checkPremium();
-      console.log('[Widget] Premium status:', premiumStatus);
-
-      if (premiumStatus.hasPremium) {
-        // Premium user - show widget everywhere, no warning
-        console.log('[Widget] User has premium - showing widget');
-        return { shouldShow: true, showWarning: false };
-      } else {
-        // Free user
-        if (inEditorOrPreview) {
-          // In editor/preview - show widget with warning
-          console.log('[Widget] Free user in editor/preview - showing widget with warning');
-          return { shouldShow: true, showWarning: true };
-        } else {
-          // On published site - hide widget
-          console.log('[Widget] Free user on published site - hiding widget');
-          return { shouldShow: false, showWarning: false };
-        }
-      }
-    } catch (error) {
-      // If we can't check premium, assume premium (fail open)
-      console.error('[Widget] Error checking premium status:', error);
-      console.log('[Widget] Falling back to showing widget without warning');
-      return { shouldShow: true, showWarning: false };
     }
   }
 
