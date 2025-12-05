@@ -212,10 +212,7 @@ class MapsyWidgetElement extends HTMLElement {
     if (this.root) {
       this.root.render(
         <React.StrictMode>
-          <App
-            apiUrl={this.config.apiUrl}
-            config={this.config}
-          />
+          <App config={this.config} />
         </React.StrictMode>
       );
     }

@@ -5,25 +5,21 @@ import apiService, {
   setCompId,
   setInstanceToken,
   getWixClient,
-  getAccessToken,
   getAccessTokenListener,
-  isInWixEnvironment,
   isInEditorMode
 } from './wixService';
 
 // Backend API URL
 const API_BASE_URL = 'https://mapsy-api.nextechspires.com/api';
 
-// Re-export Wix helpers for use in other modules
+// Re-export Wix helpers that are used by MapsyWidgetElement and wix-widget
 export {
   getInstanceToken,
   getCompId,
   setCompId,
   setInstanceToken,
   getWixClient,
-  getAccessToken,
   getAccessTokenListener,
-  isInWixEnvironment,
   isInEditorMode
 };
 
@@ -38,23 +34,12 @@ async function fetchApi(endpoint: string, options?: RequestInit): Promise<Respon
   return apiService.fetchWithAuth(url, options);
 }
 
-// Location service
-export const locationService = {
-  getAll: async (): Promise<Location[]> => {
-    const response = await fetchApi('/locations', { method: 'GET' });
+// Combined widget data service - fetches config and locations in a single request
+export const widgetDataService = {
+  getData: async (): Promise<{ config: any; locations: Location[] }> => {
+    const response = await fetchApi('/widget-data', { method: 'GET' });
     if (!response.ok) {
-      throw new Error(`Failed to fetch locations: ${response.statusText}`);
-    }
-    return response.json();
-  },
-};
-
-// Widget config service (includes hasPremium from backend)
-export const widgetConfigService = {
-  getConfig: async () => {
-    const response = await fetchApi('/widget-config', { method: 'GET' });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch config: ${response.statusText}`);
+      throw new Error(`Failed to fetch widget data: ${response.statusText}`);
     }
     return response.json();
   },

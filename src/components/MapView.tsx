@@ -7,7 +7,6 @@ interface MapViewProps {
   onMapLoad?: (map: google.maps.Map) => void;
   onMarkersLoad?: (markers: google.maps.Marker[]) => void;
   onMarkerClick?: (location: Location) => void;
-  defaultZoom?: number;
 }
 
 const MapView: React.FC<MapViewProps> = ({

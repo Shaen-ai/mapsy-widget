@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
 import { Location } from './types/location';
-import { locationService, widgetConfigService, initializeApi, isInEditorMode } from './services/api';
+import { widgetDataService, initializeApi, isInEditorMode } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
 
 interface WidgetConfig {
@@ -17,11 +17,10 @@ interface WidgetConfig {
 }
 
 interface AppProps {
-  apiUrl?: string;
   config?: Partial<WidgetConfig>;
 }
 
-function App({ apiUrl, config: externalConfig }: AppProps = {}) {
+function App({ config: externalConfig }: AppProps = {}) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,8 +46,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
 
       try {
         await initializeApi();
-        await fetchConfig();
-        await fetchLocations();
+        await fetchWidgetData();
         console.log('[Widget] ✅ Ready');
       } catch (error) {
         console.error('[Widget] ❌ Error:', (error as Error)?.message);
@@ -56,7 +54,7 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     };
 
     initializeWidget();
-  }, [apiUrl]);
+  }, []);
 
   // Apply external config changes without re-fetching from API
   useEffect(() => {
@@ -68,42 +66,36 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
     }
   }, [externalConfig]);
 
-  const fetchConfig = async () => {
+  // Fetch both config and locations in a single request
+  const fetchWidgetData = async () => {
     try {
-      const configData = await widgetConfigService.getConfig();
+      setLoading(true);
+      const { config: configData, locations: locationsData } = await widgetDataService.getData();
+
+      // Set locations
+      setLocations(locationsData);
+
+      // Set config
       const mergedConfig = { ...configData, ...externalConfig };
       setConfig(mergedConfig);
       setCurrentView(mergedConfig.defaultView || 'map');
 
-      // Check premium status - only on initial load (not on config updates from settings)
+      // Check premium status
       const inEditor = isInEditorMode();
       const hasPremium = configData.hasPremium === true;
 
       if (!hasPremium) {
         if (inEditor) {
-          // In editor/preview: show notice that widget won't appear on published site
           setShowFreePlanNotice(true);
-          // Auto-hide after 5 seconds
           setTimeout(() => setShowFreePlanNotice(false), 5000);
         } else {
-          // On published site: hide widget
           console.log('[Widget] No premium on published site - hiding widget');
           setShouldHideWidget(true);
         }
       }
     } catch (error) {
-      console.error('[Config] ❌', (error as Error)?.message);
+      console.error('[Widget Data] ❌', (error as Error)?.message);
       setCurrentView(config.defaultView || 'map');
-    }
-  };
-
-  const fetchLocations = async () => {
-    try {
-      setLoading(true);
-      const data = await locationService.getAll();
-      setLocations(data);
-    } catch (error) {
-      console.error('[Locations] ❌', (error as Error)?.message);
     } finally {
       setLoading(false);
     }
@@ -216,7 +208,6 @@ function App({ apiUrl, config: externalConfig }: AppProps = {}) {
             onMapLoad={setMapInstance}
             onMarkersLoad={setMarkers}
             onMarkerClick={setSelectedLocation}
-            defaultZoom={config.mapZoomLevel}
           />
         ) : (
           <ListView

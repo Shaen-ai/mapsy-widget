@@ -42,18 +42,6 @@ try {
 export const getWixClient = () => wixClient;
 
 /**
- * Get access token using the listener (for self-hosted apps)
- * Note: Per Wix docs, the accessTokenListener is stored in the custom element constructor
- * and fetchWithAuth should be used to make authenticated requests
- */
-export const getAccessToken = async (): Promise<string | null> => {
-  // The access token is handled internally by wixClient.fetchWithAuth
-  // We don't need to manually get it - just use fetchWithAuth
-  console.log('[WixAuth] Access token is managed by wixClient.fetchWithAuth');
-  return null;
-};
-
-/**
  * Get the access token listener (for storing in custom element)
  */
 export const getAccessTokenListener = () => accessTokenListener;
@@ -291,13 +279,6 @@ export const setInstanceToken = (token: string): void => {
 };
 
 /**
- * Check if running in Wix environment
- */
-export const isInWixEnvironment = (): boolean => {
-  return isWixEnvironment;
-};
-
-/**
  * Check if we're in the editor or preview mode (not a published site)
  * In editor/preview, we always show the widget regardless of premium status
  */
@@ -458,10 +439,6 @@ class ApiService {
 
   getWixClient() {
     return wixClient;
-  }
-
-  isWixEnvironment(): boolean {
-    return isWixEnvironment;
   }
 }
 
