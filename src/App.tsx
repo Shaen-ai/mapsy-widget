@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
 import { Location } from './types/location';
 import { widgetDataService, initializeApi, isInEditorMode } from './services/api';
-import { setConfigUpdateListener } from './MapsyWidgetElement';
 import { FiMap, FiList } from 'react-icons/fi';
 
 interface WidgetConfig {
@@ -57,22 +56,7 @@ function App({ config: externalConfig }: AppProps = {}) {
     initializeWidget();
   }, []);
 
-  // Handle config updates from settings panel (via custom element attributes)
-  const handleConfigUpdate = useCallback((newConfig: Partial<WidgetConfig>) => {
-    console.log('[Widget] Config updated from settings panel:', newConfig);
-    setConfig(prev => ({ ...prev, ...newConfig }));
-    if (newConfig.defaultView) {
-      setCurrentView(newConfig.defaultView);
-    }
-  }, []);
-
-  // Subscribe to config updates from MapsyWidgetElement
-  useEffect(() => {
-    setConfigUpdateListener(handleConfigUpdate);
-    return () => setConfigUpdateListener(null);
-  }, [handleConfigUpdate]);
-
-  // Apply initial external config
+  // Apply external config changes without re-fetching from API
   useEffect(() => {
     if (externalConfig) {
       setConfig(prev => ({ ...prev, ...externalConfig }));
@@ -80,7 +64,7 @@ function App({ config: externalConfig }: AppProps = {}) {
         setCurrentView(externalConfig.defaultView);
       }
     }
-  }, []);
+  }, [externalConfig]);
 
   // Fetch both config and locations in a single request
   const fetchWidgetData = async () => {

@@ -1,26 +1,26 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { setCompId, setInstanceToken } from './services/api';
+import {
+  setCompId,
+  setInstanceToken,
+  getWixClient,
+  getAccessTokenListener
+} from './services/api';
 
-// Global config update listener - allows React to subscribe to config changes
-type ConfigUpdateListener = (config: Record<string, any>) => void;
-let configUpdateListener: ConfigUpdateListener | null = null;
-
-export function setConfigUpdateListener(listener: ConfigUpdateListener | null) {
-  configUpdateListener = listener;
-}
-
-export function notifyConfigUpdate(config: Record<string, any>) {
-  if (configUpdateListener) {
-    configUpdateListener(config);
-  }
-}
-
+/**
+ * Custom Element for Wix integration
+ * Per Wix docs for self-hosted Site Widget:
+ * - Store accessTokenListener in constructor (required for fetchWithAuth to work)
+ * - Use wixClient.fetchWithAuth() to send requests - it automatically adds the access token
+ * - Backend extracts instanceId from the access token via Wix API
+ */
 class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
   private container: HTMLDivElement | null = null;
   public _initialized: boolean = false;
+  // Store access token listener as per Wix example
+  private accessTokenListener: any = null;
   private config = {
     defaultView: 'map' as 'map' | 'list',
     showHeader: false,
@@ -35,17 +35,24 @@ class MapsyWidgetElement extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+
+    // Store access token listener (as per Wix docs example)
+    // This is required for wixClient.fetchWithAuth to work
+    this.accessTokenListener = getAccessTokenListener();
+
+    console.log('[MapsyWidget] Constructor - Wix client:', !!getWixClient());
+    console.log('[MapsyWidget] Constructor - accessTokenListener stored:', !!this.accessTokenListener);
   }
 
   static get observedAttributes() {
     return [
-      'default-view', 'defaultview', 'defaultView',
-      'show-header', 'showheader', 'showHeader',
-      'header-title', 'headertitle', 'headerTitle',
-      'map-zoom-level', 'mapzoomlevel', 'mapZoomLevel',
-      'primary-color', 'primarycolor', 'primaryColor',
-      'show-widget-name', 'showwidgetname', 'showWidgetName',
-      'widget-name', 'widgetname', 'widgetName',
+      'default-view', 'defaultview',
+      'show-header', 'showheader',
+      'header-title', 'headertitle',
+      'map-zoom-level', 'mapzoomlevel',
+      'primary-color', 'primarycolor',
+      'show-widget-name', 'showwidgetname',
+      'widget-name', 'widgetname',
       'api-url', 'compid', 'comp-id', 'instance', 'config'
     ];
   }
@@ -53,6 +60,14 @@ class MapsyWidgetElement extends HTMLElement {
   connectedCallback() {
     if (this._initialized) return;
     this._initialized = true;
+
+    // Debug: Log all attributes on the element
+    const attrs: string[] = [];
+    for (let i = 0; i < this.attributes.length; i++) {
+      const attr = this.attributes[i];
+      attrs.push(`${attr.name}="${attr.value.substring(0, 50)}"`);
+    }
+    console.log('[Widget] Element attributes:', attrs.join(', ') || 'none');
 
     try {
       this.updateConfigFromAttributes();
@@ -70,78 +85,66 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    if (oldValue === newValue) return;
-
-    const value = newValue ?? '';
+    if (oldValue === newValue || newValue === null) return;
 
     switch (name) {
       case 'default-view':
       case 'defaultview':
-      case 'defaultView':
-        this.config.defaultView = (value === 'list' ? 'list' : 'map');
+        this.config.defaultView = (newValue === 'list' ? 'list' : 'map');
         break;
       case 'show-header':
       case 'showheader':
-      case 'showHeader':
-        this.config.showHeader = value === 'true';
+        this.config.showHeader = newValue === 'true';
         break;
       case 'header-title':
       case 'headertitle':
-      case 'headerTitle':
-        this.config.headerTitle = value || 'Our Locations';
+        this.config.headerTitle = newValue || 'Our Locations';
         break;
       case 'map-zoom-level':
       case 'mapzoomlevel':
-      case 'mapZoomLevel':
-        this.config.mapZoomLevel = parseInt(value || '12', 10);
+        this.config.mapZoomLevel = parseInt(newValue || '12', 10);
         break;
       case 'primary-color':
       case 'primarycolor':
-      case 'primaryColor':
-        this.config.primaryColor = value || '#3B82F6';
+        this.config.primaryColor = newValue || '#3B82F6';
         break;
       case 'show-widget-name':
       case 'showwidgetname':
-      case 'showWidgetName':
-        this.config.showWidgetName = value === 'true';
+        this.config.showWidgetName = newValue === 'true';
         break;
       case 'widget-name':
       case 'widgetname':
-      case 'widgetName':
-        this.config.widgetName = value || '';
+        this.config.widgetName = newValue || '';
         break;
       case 'api-url':
-        this.config.apiUrl = value || 'https://mapsy-api.nextechspires.com/api';
+        this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
         break;
       case 'compid':
       case 'comp-id':
-        if (value) setCompId(value);
+        // Set compId in the wixService for API requests
+        setCompId(newValue);
         return;
       case 'instance':
-        if (value) setInstanceToken(value);
+        // Set instance token in the wixService for API requests
+        setInstanceToken(newValue);
         return;
       case 'config':
         try {
-          if (value) {
-            const parsedConfig = JSON.parse(value);
-            this.config = { ...this.config, ...parsedConfig };
-          }
-        } catch {
-          // Invalid JSON, ignore
+          const parsedConfig = JSON.parse(newValue);
+          this.config = { ...this.config, ...parsedConfig };
+        } catch (error) {
+          console.error('[Widget] Config parse error:', error);
         }
         break;
-      default:
-        return;
     }
 
-    // Notify React component of config change (without remounting)
-    if (this._initialized) {
-      this.config = { ...this.config };
-      notifyConfigUpdate(this.config);
+    if (this.root) {
+      this.mountReactApp();
     }
   }
 
   private updateConfigFromAttributes() {
+    // Read all attributes and update config
     const defaultView = this.getAttribute('default-view');
     const showHeader = this.getAttribute('show-header');
     const headerTitle = this.getAttribute('header-title');
@@ -162,16 +165,24 @@ class MapsyWidgetElement extends HTMLElement {
     if (widgetName) this.config.widgetName = widgetName;
     if (apiUrl) this.config.apiUrl = apiUrl;
 
-    if (compIdAttr) setCompId(compIdAttr);
-    if (instanceAttr) setInstanceToken(instanceAttr);
+    // Set Wix-specific attributes in the service
+    if (compIdAttr) {
+      setCompId(compIdAttr);
+    }
+    if (instanceAttr) {
+      setInstanceToken(instanceAttr);
+    }
   }
 
   private mountReactApp() {
+    // Only set up shadow DOM once
     if (!this.container && this.shadowRoot) {
+      // Create container for React app
       this.container = document.createElement('div');
       this.container.style.width = '100%';
       this.container.style.height = '100%';
 
+      // Add styles to shadow DOM
       const style = document.createElement('style');
       style.textContent = `
         :host {
@@ -185,15 +196,19 @@ class MapsyWidgetElement extends HTMLElement {
       `;
       this.shadowRoot.appendChild(style);
 
+      // Add link to widget's compiled CSS from the CDN
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = 'https://mapsy-widget.nextechspires.com/style.css';
       this.shadowRoot.appendChild(link);
 
       this.shadowRoot.appendChild(this.container);
+
+      // Create React root once
       this.root = ReactDOM.createRoot(this.container);
     }
 
+    // Render/update React app
     if (this.root) {
       this.root.render(
         <React.StrictMode>
@@ -217,6 +232,7 @@ class MapsyWidgetElement extends HTMLElement {
 if (!customElements.get('mapsy-widget')) {
   customElements.define('mapsy-widget', MapsyWidgetElement);
 
+  // Manually upgrade any existing elements that were in DOM before registration
   document.querySelectorAll('mapsy-widget').forEach((widget) => {
     if (widget instanceof MapsyWidgetElement && !widget._initialized) {
       widget.connectedCallback();
