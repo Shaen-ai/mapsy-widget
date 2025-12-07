@@ -50,6 +50,9 @@ const MapView: React.FC<MapViewProps> = ({
         if (onMapLoad) {
           onMapLoad(mapInstance.current);
         }
+      } else if (mapInstance.current) {
+        // Map already exists, apply new zoom level directly
+        mapInstance.current.setZoom(mapZoomLevel);
       }
 
       // Clear existing markers
