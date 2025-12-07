@@ -46,13 +46,14 @@ class MapsyWidgetElement extends HTMLElement {
 
   static get observedAttributes() {
     return [
-      'default-view', 'defaultview',
-      'show-header', 'showheader',
-      'header-title', 'headertitle',
-      'map-zoom-level', 'mapzoomlevel',
-      'primary-color', 'primarycolor',
-      'show-widget-name', 'showwidgetname',
-      'widget-name', 'widgetname',
+      // kebab-case, lowercase, and camelCase variants for flexibility
+      'default-view', 'defaultview', 'defaultView',
+      'show-header', 'showheader', 'showHeader',
+      'header-title', 'headertitle', 'headerTitle',
+      'map-zoom-level', 'mapzoomlevel', 'mapZoomLevel',
+      'primary-color', 'primarycolor', 'primaryColor',
+      'show-widget-name', 'showwidgetname', 'showWidgetName',
+      'widget-name', 'widgetname', 'widgetName',
       'api-url', 'compid', 'comp-id', 'instance', 'config'
     ];
   }
@@ -85,60 +86,79 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    if (oldValue === newValue || newValue === null) return;
+    if (oldValue === newValue) return;
+
+    // Handle null values for removal of attributes
+    const value = newValue ?? '';
+
+    console.log(`[Widget] Attribute changed: ${name} = ${value}`);
 
     switch (name) {
       case 'default-view':
       case 'defaultview':
-        this.config.defaultView = (newValue === 'list' ? 'list' : 'map');
+      case 'defaultView':
+        this.config.defaultView = (value === 'list' ? 'list' : 'map');
         break;
       case 'show-header':
       case 'showheader':
-        this.config.showHeader = newValue === 'true';
+      case 'showHeader':
+        this.config.showHeader = value === 'true';
         break;
       case 'header-title':
       case 'headertitle':
-        this.config.headerTitle = newValue || 'Our Locations';
+      case 'headerTitle':
+        this.config.headerTitle = value || 'Our Locations';
         break;
       case 'map-zoom-level':
       case 'mapzoomlevel':
-        this.config.mapZoomLevel = parseInt(newValue || '12', 10);
+      case 'mapZoomLevel':
+        this.config.mapZoomLevel = parseInt(value || '12', 10);
         break;
       case 'primary-color':
       case 'primarycolor':
-        this.config.primaryColor = newValue || '#3B82F6';
+      case 'primaryColor':
+        this.config.primaryColor = value || '#3B82F6';
         break;
       case 'show-widget-name':
       case 'showwidgetname':
-        this.config.showWidgetName = newValue === 'true';
+      case 'showWidgetName':
+        this.config.showWidgetName = value === 'true';
         break;
       case 'widget-name':
       case 'widgetname':
-        this.config.widgetName = newValue || '';
+      case 'widgetName':
+        this.config.widgetName = value || '';
         break;
       case 'api-url':
-        this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
+        this.config.apiUrl = value || 'https://mapsy-api.nextechspires.com/api';
         break;
       case 'compid':
       case 'comp-id':
         // Set compId in the wixService for API requests
-        setCompId(newValue);
+        if (value) setCompId(value);
         return;
       case 'instance':
         // Set instance token in the wixService for API requests
-        setInstanceToken(newValue);
+        if (value) setInstanceToken(value);
         return;
       case 'config':
         try {
-          const parsedConfig = JSON.parse(newValue);
-          this.config = { ...this.config, ...parsedConfig };
+          if (value) {
+            const parsedConfig = JSON.parse(value);
+            this.config = { ...this.config, ...parsedConfig };
+          }
         } catch (error) {
           console.error('[Widget] Config parse error:', error);
         }
         break;
+      default:
+        return; // Unknown attribute, don't re-render
     }
 
-    if (this.root) {
+    // Re-render React app with updated config
+    if (this.root && this._initialized) {
+      // Create a new config object to ensure React detects the change
+      this.config = { ...this.config };
       this.mountReactApp();
     }
   }

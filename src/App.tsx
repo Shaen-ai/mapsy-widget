@@ -57,14 +57,16 @@ function App({ config: externalConfig }: AppProps = {}) {
   }, []);
 
   // Apply external config changes without re-fetching from API
+  // Use JSON.stringify to detect actual value changes (not just reference changes)
   useEffect(() => {
     if (externalConfig) {
+      console.log('[Widget] Config updated from settings panel:', externalConfig);
       setConfig(prev => ({ ...prev, ...externalConfig }));
       if (externalConfig.defaultView) {
         setCurrentView(externalConfig.defaultView);
       }
     }
-  }, [externalConfig]);
+  }, [JSON.stringify(externalConfig)]);
 
   // Fetch both config and locations in a single request
   const fetchWidgetData = async () => {
