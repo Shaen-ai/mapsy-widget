@@ -75,10 +75,9 @@ function App({ config: externalConfig }: AppProps = {}) {
       // Set locations
       setLocations(locationsData);
 
-      // Set config
-      const mergedConfig = { ...configData, ...externalConfig };
-      setConfig(mergedConfig);
-      setCurrentView(mergedConfig.defaultView || 'map');
+      // Set config - API config takes priority, external config only applies for live editing
+      setConfig(configData);
+      setCurrentView(configData.defaultView || 'map');
 
       // Check premium status
       const inEditor = isInEditorMode();
