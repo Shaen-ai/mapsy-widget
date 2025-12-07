@@ -5,6 +5,8 @@ import { Location } from './types/location';
 import { widgetDataService, initializeApi, isInEditorMode } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
 
+type PremiumPlanName = 'free' | 'light' | 'business' | 'business-pro';
+
 interface WidgetConfig {
   defaultView: 'map' | 'list';
   showHeader: boolean;
@@ -13,7 +15,7 @@ interface WidgetConfig {
   primaryColor?: string;
   showWidgetName?: boolean;
   widgetName?: string;
-  hasPremium?: boolean;
+  premiumPlanName?: PremiumPlanName;
 }
 
 interface AppProps {
@@ -79,16 +81,17 @@ function App({ config: externalConfig }: AppProps = {}) {
       setConfig(configData);
       setCurrentView(configData.defaultView || 'map');
 
-      // Check premium status
+      // Check premium status - hide widget only if premiumPlanName is 'free'
       const inEditor = isInEditorMode();
-      const hasPremium = configData.hasPremium === true;
+      const premiumPlan = configData.premiumPlanName || 'free';
+      const isFreePlan = premiumPlan === 'free';
 
-      if (!hasPremium) {
+      if (isFreePlan) {
         if (inEditor) {
           setShowFreePlanNotice(true);
           setTimeout(() => setShowFreePlanNotice(false), 5000);
         } else {
-          console.log('[Widget] No premium on published site - hiding widget');
+          console.log('[Widget] Free plan on published site - hiding widget');
           setShouldHideWidget(true);
         }
       }
