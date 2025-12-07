@@ -204,6 +204,7 @@ function App({ config: externalConfig }: AppProps = {}) {
         {currentView === 'map' ? (
           <MapView
             locations={locations}
+            mapZoomLevel={config.mapZoomLevel}
             onMapLoad={setMapInstance}
             onMarkersLoad={setMarkers}
             onMarkerClick={setSelectedLocation}

@@ -4,6 +4,7 @@ import { Location } from '../types/location';
 
 interface MapViewProps {
   locations: Location[];
+  mapZoomLevel?: number;
   onMapLoad?: (map: google.maps.Map) => void;
   onMarkersLoad?: (markers: google.maps.Marker[]) => void;
   onMarkerClick?: (location: Location) => void;
@@ -11,6 +12,7 @@ interface MapViewProps {
 
 const MapView: React.FC<MapViewProps> = ({
   locations,
+  mapZoomLevel = 12,
   onMapLoad,
   onMarkersLoad,
   onMarkerClick,
@@ -35,7 +37,7 @@ const MapView: React.FC<MapViewProps> = ({
         // Initialize map with mapId for AdvancedMarkerElement support
         mapInstance.current = new google.maps.Map(mapRef.current, {
           center: { lat: 40.7128, lng: -74.0060 },
-          zoom: 12,
+          zoom: mapZoomLevel,
           mapTypeControl: false,
           fullscreenControl: true,
           streetViewControl: true,
@@ -127,10 +129,14 @@ const MapView: React.FC<MapViewProps> = ({
         if (newMarkers.length > 0) {
           mapInstance.current.fitBounds(bounds);
 
-          // Ensure zoom is not too close for single marker
+          // Apply configured zoom level after fitBounds
           const listener = google.maps.event.addListener(mapInstance.current, 'idle', () => {
-            if (mapInstance.current && mapInstance.current.getZoom() && mapInstance.current.getZoom()! > 16) {
-              mapInstance.current.setZoom(16);
+            if (mapInstance.current) {
+              const currentZoom = mapInstance.current.getZoom();
+              // If zoom is too close or we have a configured level, apply it
+              if (currentZoom && currentZoom > mapZoomLevel) {
+                mapInstance.current.setZoom(mapZoomLevel);
+              }
             }
             google.maps.event.removeListener(listener);
           });
@@ -148,7 +154,7 @@ const MapView: React.FC<MapViewProps> = ({
         }
       });
     };
-  }, [locations, onMapLoad, onMarkersLoad, onMarkerClick]);
+  }, [locations, mapZoomLevel, onMapLoad, onMarkersLoad, onMarkerClick]);
 
   const createInfoWindowContent = (location: Location): string => {
     const getCurrentDayHours = () => {
