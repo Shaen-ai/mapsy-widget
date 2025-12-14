@@ -56,27 +56,6 @@ function App({ config: externalConfig }: AppProps = {}) {
     };
 
     initializeWidget();
-
-    // Listen for config updates from settings panel via postMessage
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-
-        // Check if this is a config update from the settings panel
-        if (data?.type === 'configUpdate' || data?.config) {
-          console.log('[Widget] Received config update via postMessage, refetching data...');
-          fetchWidgetData();
-        }
-      } catch (e) {
-        // Ignore non-JSON messages
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
   }, []);
 
   // Apply external config changes without re-fetching from API
