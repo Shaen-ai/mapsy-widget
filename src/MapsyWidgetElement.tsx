@@ -147,7 +147,16 @@ class MapsyWidgetElement extends HTMLElement {
       case 'config':
         try {
           const parsedConfig = JSON.parse(newValue);
-          this.config = { ...this.config, ...parsedConfig };
+
+          // Extract auth data if present
+          if (parsedConfig.auth?.instanceToken) {
+            setInstanceToken(parsedConfig.auth.instanceToken);
+            console.log('[Widget] ✅ Instance token extracted from config.auth');
+          }
+
+          // Remove auth from config before storing (it's not a display config)
+          const { auth, ...configWithoutAuth } = parsedConfig;
+          this.config = { ...this.config, ...configWithoutAuth };
         } catch (error) {
           console.error('[Widget] Config parse error:', error);
         }

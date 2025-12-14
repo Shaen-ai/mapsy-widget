@@ -362,32 +362,24 @@ export const fetchWithAuth = async (url: string, options?: RequestInit): Promise
     headers,
   };
 
-  // Use Wix authenticated fetch if available (recommended per Wix docs)
-  // This automatically injects the Wix access token
-  if (isWixEnvironment && wixClient?.fetchWithAuth) {
-    console.log('[FetchWithAuth] 🔐 Using wixClient.fetchWithAuth (Wix recommended method)...');
+  // Prefer manual auth with instance token if available (wixClient.fetchWithAuth doesn't work in editor)
+  if (instanceToken) {
+    headers['Authorization'] = `Bearer ${instanceToken}`;
+    console.log('[FetchWithAuth] ✅ Using manual Authorization header with instance token');
+    console.log('[FetchWithAuth] 🔍 Headers:', Object.keys(headers));
+  } else if (isWixEnvironment && wixClient?.fetchWithAuth) {
+    // Try Wix SDK fetchWithAuth as fallback
+    console.log('[FetchWithAuth] 🔐 Trying wixClient.fetchWithAuth (no manual token available)...');
     console.log('[FetchWithAuth] 🔍 Headers being sent:', fetchOptions.headers);
     try {
       const response = await wixClient.fetchWithAuth(url, fetchOptions);
       console.log('[FetchWithAuth] ✅ wixClient.fetchWithAuth response:', response.status);
-
-      // Check if auth was actually sent by inspecting the response
-      // In editor mode, the backend should have received auth
-      console.log('[FetchWithAuth] ⚠️ WARNING: If backend returns default data, auth header might not be working!');
-
       return response;
     } catch (error: any) {
       console.error('[FetchWithAuth] ❌ wixClient.fetchWithAuth failed:', error?.message);
-      console.log('[FetchWithAuth] Falling back to direct fetch with manual token...');
     }
-  }
-
-  // Fallback: Add instance token manually to Authorization header
-  if (instanceToken) {
-    headers['Authorization'] = `Bearer ${instanceToken}`;
-    console.log('[FetchWithAuth] ✅ Added Authorization header with instance token');
   } else {
-    console.log('[FetchWithAuth] ⚠️ No instance token available');
+    console.log('[FetchWithAuth] ⚠️ No instance token and wixClient.fetchWithAuth not available');
   }
 
   // Direct fetch
