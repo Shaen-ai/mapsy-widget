@@ -366,9 +366,15 @@ export const fetchWithAuth = async (url: string, options?: RequestInit): Promise
   // This automatically injects the Wix access token
   if (isWixEnvironment && wixClient?.fetchWithAuth) {
     console.log('[FetchWithAuth] 🔐 Using wixClient.fetchWithAuth (Wix recommended method)...');
+    console.log('[FetchWithAuth] 🔍 Headers being sent:', fetchOptions.headers);
     try {
       const response = await wixClient.fetchWithAuth(url, fetchOptions);
       console.log('[FetchWithAuth] ✅ wixClient.fetchWithAuth response:', response.status);
+
+      // Check if auth was actually sent by inspecting the response
+      // In editor mode, the backend should have received auth
+      console.log('[FetchWithAuth] ⚠️ WARNING: If backend returns default data, auth header might not be working!');
+
       return response;
     } catch (error: any) {
       console.error('[FetchWithAuth] ❌ wixClient.fetchWithAuth failed:', error?.message);

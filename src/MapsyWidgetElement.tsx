@@ -53,7 +53,7 @@ class MapsyWidgetElement extends HTMLElement {
       'primary-color', 'primarycolor',
       'show-widget-name', 'showwidgetname',
       'widget-name', 'widgetname',
-      'api-url', 'compid', 'comp-id', 'instance', 'config'
+      'api-url', 'compid', 'comp-id', 'instance', 'config', 'auth'
     ];
   }
 
@@ -87,6 +87,8 @@ class MapsyWidgetElement extends HTMLElement {
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
     if (oldValue === newValue || newValue === null) return;
 
+    console.log(`[Widget] ✅ Attribute changed: ${name} = ${newValue} (old: ${oldValue})`);
+
     switch (name) {
       case 'default-view':
       case 'defaultview':
@@ -103,6 +105,7 @@ class MapsyWidgetElement extends HTMLElement {
       case 'map-zoom-level':
       case 'mapzoomlevel':
         this.config.mapZoomLevel = parseInt(newValue || '12', 10);
+        console.log(`[Widget] 🔍 Zoom level updated: ${oldValue} → ${this.config.mapZoomLevel}`);
         break;
       case 'primary-color':
       case 'primarycolor':
@@ -128,6 +131,19 @@ class MapsyWidgetElement extends HTMLElement {
         // Set instance token in the wixService for API requests
         setInstanceToken(newValue);
         return;
+      case 'auth':
+        // Wix might pass auth data as an attribute
+        try {
+          const authData = JSON.parse(newValue);
+          console.log('[Widget] 🔐 Auth attribute received:', authData);
+          if (authData.instance) {
+            setInstanceToken(authData.instance);
+            console.log('[Widget] ✅ Instance token extracted from auth attribute');
+          }
+        } catch (error) {
+          console.log('[Widget] ⚠️ Could not parse auth attribute');
+        }
+        return;
       case 'config':
         try {
           const parsedConfig = JSON.parse(newValue);
@@ -139,6 +155,7 @@ class MapsyWidgetElement extends HTMLElement {
     }
 
     if (this.root) {
+      console.log(`[Widget] 🔄 Re-rendering with config:`, this.config);
       this.mountReactApp();
     }
   }
