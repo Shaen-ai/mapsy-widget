@@ -412,6 +412,7 @@ class ApiService {
   }
 
   async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
+    console.log('fetchweithauth options',options)
     return fetchWithAuth(url, options);
   }
 
