@@ -198,7 +198,7 @@ const extractInstanceFromUrl = (): string | null => {
 /**
  * Initialize Wix data
  * Per Wix docs for self-hosted Site Widget:
- * - compId may be passed via URL or attributes
+ * - compId may be passed via URL or attributes (saved by settings panel)
  * - instanceId is extracted by the BACKEND from the access token sent via fetchWithAuth
  * - We don't need to manually get the token on frontend
  */
@@ -221,7 +221,7 @@ const initializeWixData = async (): Promise<void> => {
     console.log('[WixInit] ✅ Instance from URL');
   }
 
-  // 2. Check DOM elements for compId
+  // 2. Check DOM elements for compId (saved by settings panel via widget.setProp)
   if (!compId) {
     const elementCompId = extractCompIdFromElement();
     if (elementCompId) {
@@ -240,12 +240,18 @@ const initializeWixData = async (): Promise<void> => {
 
   // Final summary
   console.log('[WixInit] ========== SUMMARY ==========');
-  console.log('[WixInit] compId:', compId);
+  console.log('[WixInit] compId:', compId || 'NOT SET (will fetch default data)');
   console.log('[WixInit] instanceToken (manual):', instanceToken ? 'present' : 'null (will use fetchWithAuth)');
   console.log('[WixInit] isWixEnvironment:', isWixEnvironment);
   console.log('[WixInit] wixClient.fetchWithAuth available:', !!wixClient?.fetchWithAuth);
   console.log('[WixInit] ==============================');
-  console.log('[WixInit] Note: Instance ID will be extracted by backend from access token');
+
+  if (!compId) {
+    console.log('[WixInit] ⚠️ No compId found - will fetch default/demo data without authentication');
+    console.log('[WixInit] 💡 Tip: Open settings panel to generate and save a compId');
+  } else {
+    console.log('[WixInit] ✅ CompId found - will fetch widget-specific data with authentication');
+  }
 };
 
 /**
@@ -338,31 +344,69 @@ export const isInEditorMode = (): boolean => {
 };
 
 /**
- * Fetch with Wix authentication
+ * Fetch with Wix authentication (or unauthenticated if no comp-id or in editor)
+ *
+ * Behavior:
+ * - Editor mode: ALWAYS unauthenticated (with comp-id header only if available)
+ * - Published site without comp-id: Unauthenticated request (no headers)
+ * - Published site with comp-id: Authenticated request (Authorization + comp-id)
+ *
  * Per Wix docs: Use wixClient.fetchWithAuth() to send the access token to your backend
  * The backend can then extract instanceId from the token via Wix API
  */
 export const fetchWithAuth = async (url: string, options?: RequestInit): Promise<Response> => {
   console.log('[FetchWithAuth] 🔄 Starting fetch to:', url);
   console.log('[FetchWithAuth] Method:', options?.method || 'GET');
+  console.log('[FetchWithAuth] CompId:', compId || 'NOT SET');
+
+  const inEditor = isInEditorMode();
+  console.log('[FetchWithAuth] Editor mode:', inEditor);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string>),
   };
 
-  // Add compId header if available
-  if (compId) {
-    headers['X-Wix-Comp-Id'] = compId;
-    console.log('[FetchWithAuth] ✅ Added X-Wix-Comp-Id header:', compId);
+  // EDITOR MODE: Always unauthenticated, but send comp-id if available
+  if (inEditor) {
+    console.log('[FetchWithAuth] 📝 Editor mode - making unauthenticated request');
+    if (compId) {
+      headers['X-Wix-Comp-Id'] = compId;
+      console.log('[FetchWithAuth] ✅ Added X-Wix-Comp-Id header (editor):', compId);
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+    console.log('[FetchWithAuth] ✅ Editor unauthenticated fetch response:', response.status);
+    return response;
   }
+
+  // PUBLISHED SITE: Check if comp-id exists
+  if (!compId) {
+    console.log('[FetchWithAuth] 🌐 Published site, no compId - unauthenticated request for default data');
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+    console.log('[FetchWithAuth] ✅ Unauthenticated fetch response:', response.status);
+    return response;
+  }
+
+  // PUBLISHED SITE with comp-id: Make authenticated request
+  console.log('[FetchWithAuth] 🔐 Published site with compId - making authenticated request');
+
+  // Add compId header
+  headers['X-Wix-Comp-Id'] = compId;
+  console.log('[FetchWithAuth] ✅ Added X-Wix-Comp-Id header:', compId);
 
   const fetchOptions: RequestInit = {
     ...options,
     headers,
   };
 
-  // Prefer manual auth with instance token if available (wixClient.fetchWithAuth doesn't work in editor)
+  // Prefer manual auth with instance token if available
   if (instanceToken) {
     headers['Authorization'] = `Bearer ${instanceToken}`;
     console.log('[FetchWithAuth] ✅ Using manual Authorization header with instance token');
@@ -382,15 +426,15 @@ export const fetchWithAuth = async (url: string, options?: RequestInit): Promise
     console.log('[FetchWithAuth] ⚠️ No instance token and wixClient.fetchWithAuth not available');
   }
 
-  // Direct fetch
-  console.log('[FetchWithAuth] 📡 Using direct fetch...');
+  // Direct fetch with auth headers
+  console.log('[FetchWithAuth] 📡 Using direct fetch with auth headers...');
   console.log('[FetchWithAuth] Final headers:', Object.keys(headers));
 
   const response = await fetch(url, {
     ...options,
     headers,
   });
-  console.log('[FetchWithAuth] Direct fetch response:', response.status);
+  console.log('[FetchWithAuth] ✅ Authenticated fetch response:', response.status);
   return response;
 };
 
