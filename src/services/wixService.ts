@@ -406,35 +406,41 @@ export const fetchWithAuth = async (url: string, options?: RequestInit): Promise
     headers,
   };
 
-  // Prefer manual auth with instance token if available
-  if (instanceToken) {
-    headers['Authorization'] = `Bearer ${instanceToken}`;
-    console.log('[FetchWithAuth] ✅ Using manual Authorization header with instance token');
-    console.log('[FetchWithAuth] 🔍 Headers:', Object.keys(headers));
-  } else if (isWixEnvironment && wixClient?.fetchWithAuth) {
-    // Try Wix SDK fetchWithAuth as fallback
-    console.log('[FetchWithAuth] 🔐 Trying wixClient.fetchWithAuth (no manual token available)...');
-    console.log('[FetchWithAuth] 🔍 Headers being sent:', fetchOptions.headers);
+  // PREFER Wix SDK fetchWithAuth (recommended method per Wix docs)
+  if (isWixEnvironment && wixClient?.fetchWithAuth) {
+    console.log('[FetchWithAuth] 🔐 Using wixClient.fetchWithAuth (Wix SDK - preferred method)');
+    console.log('[FetchWithAuth] 🔍 Headers being sent:', Object.keys(headers));
     try {
       const response = await wixClient.fetchWithAuth(url, fetchOptions);
       console.log('[FetchWithAuth] ✅ wixClient.fetchWithAuth response:', response.status);
       return response;
     } catch (error: any) {
       console.error('[FetchWithAuth] ❌ wixClient.fetchWithAuth failed:', error?.message);
+      console.log('[FetchWithAuth] Falling back to manual authentication...');
     }
-  } else {
-    console.log('[FetchWithAuth] ⚠️ No instance token and wixClient.fetchWithAuth not available');
   }
 
-  // Direct fetch with auth headers
-  console.log('[FetchWithAuth] 📡 Using direct fetch with auth headers...');
-  console.log('[FetchWithAuth] Final headers:', Object.keys(headers));
+  // FALLBACK: Manual auth with instance token (if fetchWithAuth failed or unavailable)
+  if (instanceToken) {
+    headers['Authorization'] = `Bearer ${instanceToken}`;
+    console.log('[FetchWithAuth] 📡 Using manual Authorization header with instance token (fallback)');
+    console.log('[FetchWithAuth] 🔍 Headers:', Object.keys(headers));
 
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+    console.log('[FetchWithAuth] ✅ Manual auth fetch response:', response.status);
+    return response;
+  }
+
+  // LAST RESORT: Direct fetch without auth (shouldn't happen in published site with compId)
+  console.log('[FetchWithAuth] ⚠️ No authentication available - using direct fetch');
   const response = await fetch(url, {
     ...options,
     headers,
   });
-  console.log('[FetchWithAuth] ✅ Authenticated fetch response:', response.status);
+  console.log('[FetchWithAuth] ✅ Unauthenticated fetch response:', response.status);
   return response;
 };
 
