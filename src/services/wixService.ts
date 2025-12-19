@@ -296,18 +296,7 @@ export const isInEditorMode = (): boolean => {
 
   // Editor and preview URLs typically contain these patterns
   const editorPatterns = [
-    'editor.wix.com',
-    'editor-elements-registry',
-    '/editor/',
-    'wixsite.com/_preview',
-    'editorx.com',
-    'wixstudio.com',
-    '/edit',
-    'preview=true',
-    'viewMode=editor',
-    'viewMode=preview',
-    '/preview/',
-    '_preview',
+    'editor.wix.com'
   ];
 
   for (const pattern of editorPatterns) {
