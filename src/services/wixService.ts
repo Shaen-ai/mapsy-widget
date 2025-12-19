@@ -289,46 +289,13 @@ export const setInstanceToken = (token: string): void => {
  * In editor/preview, we always show the widget regardless of premium status
  */
 export const isInEditorMode = (): boolean => {
-  if (typeof window === 'undefined') return false;
-
   // Check URL patterns that indicate editor or preview mode
   const url = window.location.href.toLowerCase();
 
-  // Editor and preview URLs typically contain these patterns
-  const editorPatterns = [
-    'editor.wix.com'
-  ];
-
-  for (const pattern of editorPatterns) {
-    if (url.includes(pattern)) {
-      console.log('[Wix] Detected editor/preview mode via URL pattern:', pattern);
-      return true;
-    }
-  }
-
-  // Check Wix window globals
-  const win = window as any;
-
-  // Check for editor-specific globals
-  const viewMode = win.Wix?.Utils?.getViewMode?.();
-  if (viewMode && viewMode !== 'Site') {
-    console.log('[Wix] Detected non-site mode via Wix.Utils.getViewMode:', viewMode);
+  if (url.includes('editor.wix.com')) {
     return true;
   }
-
-  // Check for editor/preview mode in warmupData
-  if (win.warmupData?.viewMode && win.warmupData.viewMode !== 'site') {
-    console.log('[Wix] Detected editor/preview mode via warmupData.viewMode:', win.warmupData.viewMode);
-    return true;
-  }
-
-  // Check for rendering context
-  if (win.renderingContext?.viewMode && win.renderingContext.viewMode !== 'SITE') {
-    console.log('[Wix] Detected editor/preview mode via renderingContext:', win.renderingContext.viewMode);
-    return true;
-  }
-
-  // Default: assume published site
+  
   return false;
 };
 
