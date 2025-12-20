@@ -299,35 +299,11 @@ export function setViewModeFromWixConfig(viewMode: 'Editor' | 'Preview' | 'Site'
 }
 
 /**
- * Get current view mode
+ * Get current view mode from wixconfig attribute
  */
 export function getViewMode(): 'Editor' | 'Preview' | 'Site' {
   return currentViewMode;
 }
-
-/**
- * Check if we're in the editor or preview mode (not a published site)
- * In editor/preview, we always show the widget regardless of premium status
- */
-export const isInEditorMode = (): boolean => {
-  // Use ViewMode from wixconfig attribute (Wix official method)
-  if (currentViewMode === 'Editor' || currentViewMode === 'Preview') {
-    return true;
-  }
-
-  // Fallback: Check URL patterns if wixconfig hasn't been set yet
-  const url = window.location.href.toLowerCase();
-
-  if (url.includes('editor.wix.com') || url.includes('editor-x.wix.com')) {
-    return true;
-  }
-
-  if (url.includes('preview.wix.com')) {
-    return true;
-  }
-
-  return false;
-};
 
 /**
  * Fetch with Wix authentication (or unauthenticated if no comp-id or in editor)
@@ -345,8 +321,9 @@ export const fetchWithAuth = async (url: string, options?: RequestInit): Promise
   console.log('[FetchWithAuth] Method:', options?.method || 'GET');
   console.log('[FetchWithAuth] CompId:', compId || 'NOT SET');
 
-  const inEditor = isInEditorMode();
-  console.log('[FetchWithAuth] Editor mode:', inEditor);
+  const viewMode = getViewMode();
+  const inEditor = viewMode === 'Editor' || viewMode === 'Preview';
+  console.log('[FetchWithAuth] ViewMode:', viewMode, '| Editor mode:', inEditor);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -355,7 +332,7 @@ export const fetchWithAuth = async (url: string, options?: RequestInit): Promise
 
   // EDITOR MODE: Always unauthenticated, but send comp-id if available
   if (inEditor) {
-    console.log('[FetchWithAuth] 📝 Editor mode - making unauthenticated request');
+    console.log('[FetchWithAuth] 📝 Editor/Preview mode - making unauthenticated request');
     if (compId) {
       headers['X-Wix-Comp-Id'] = compId;
       console.log('[FetchWithAuth] ✅ Added X-Wix-Comp-Id header (editor):', compId);

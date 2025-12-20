@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
 import { Location } from './types/location';
-import { widgetDataService, initializeApi, isInEditorMode } from './services/api';
+import { widgetDataService, initializeApi, getViewMode } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
 
 type PremiumPlanName = 'free' | 'light' | 'business' | 'business-pro';
@@ -82,7 +82,8 @@ function App({ config: externalConfig }: AppProps = {}) {
       setCurrentView(configData.defaultView || 'map');
 
       // Check premium status - hide widget only if premiumPlanName is 'free'
-      const inEditor = isInEditorMode();
+      const viewMode = getViewMode();
+      const inEditor = viewMode === 'Editor' || viewMode === 'Preview';
       const premiumPlan = configData.premiumPlanName || 'free';
       const isFreePlan = premiumPlan === 'free';
 
