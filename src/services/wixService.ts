@@ -54,18 +54,6 @@ if (typeof window !== 'undefined') {
     try {
       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
 
-      // ✅ NEW: Listen for Wix view mode changes (Editor/Preview/Site)
-      if (data?.type === 'VIEW_MODE_CHANGED' && data?.viewMode) {
-        currentViewMode = data.viewMode;
-        console.log('[Wix] 🔄 VIEW_MODE_CHANGED detected:', currentViewMode);
-      }
-
-      // Older view mode format (fallback)
-      if (data?.viewMode && data.type !== 'VIEW_MODE_CHANGED') {
-        currentViewMode = data.viewMode;
-        console.log('[Wix] 🔄 viewMode detected (fallback):', currentViewMode);
-      }
-
       // Check for compId in various message formats
       if (data?.compId && !compId) {
         compId = data.compId;
@@ -297,34 +285,24 @@ export const setInstanceToken = (token: string): void => {
 };
 
 /**
- * Current Wix view mode - dynamically updated via message events
+ * Current Wix view mode - set from wixconfig attribute (Wix official method)
  */
 let currentViewMode: 'Editor' | 'Preview' | 'Site' = 'Site';
 
 /**
- * ✅ IMPROVED: Detect Wix editor mode using message events (more reliable than URL checking)
- * Wix sends VIEW_MODE_CHANGED messages when the user switches between Editor/Preview/Site
+ * ✅ WIX OFFICIAL: Set ViewMode from wixconfig attribute
+ * This is called by MapsyWidgetElement when wixconfig attribute is received
  */
-export function detectEditorMode(
-  onChange: (mode: 'Editor' | 'Preview' | 'Site') => void
-) {
-  window.addEventListener('message', (event) => {
-    if (!event.data) return;
+export function setViewModeFromWixConfig(viewMode: 'Editor' | 'Preview' | 'Site'): void {
+  currentViewMode = viewMode;
+  console.log('[Wix] 🔄 ViewMode set from wixconfig:', currentViewMode);
+}
 
-    // Wix editor messages - new format
-    if (event.data.type === 'VIEW_MODE_CHANGED') {
-      currentViewMode = event.data.viewMode;
-      console.log('[Wix] 🔄 View mode changed:', currentViewMode);
-      onChange(currentViewMode);
-    }
-
-    // Older / fallback format
-    if (event.data.viewMode && event.data.type !== 'VIEW_MODE_CHANGED') {
-      currentViewMode = event.data.viewMode;
-      console.log('[Wix] 🔄 View mode (fallback):', currentViewMode);
-      onChange(currentViewMode);
-    }
-  });
+/**
+ * Get current view mode
+ */
+export function getViewMode(): 'Editor' | 'Preview' | 'Site' {
+  return currentViewMode;
 }
 
 /**
@@ -332,26 +310,22 @@ export function detectEditorMode(
  * In editor/preview, we always show the widget regardless of premium status
  */
 export const isInEditorMode = (): boolean => {
-  // First check the dynamic view mode from message events
+  // Use ViewMode from wixconfig attribute (Wix official method)
   if (currentViewMode === 'Editor' || currentViewMode === 'Preview') {
     return true;
   }
 
-  // Fallback: Check URL patterns for initial load
+  // Fallback: Check URL patterns if wixconfig hasn't been set yet
   const url = window.location.href.toLowerCase();
-  console.log('[Wix] URL detected:', url);
 
   if (url.includes('editor.wix.com') || url.includes('editor-x.wix.com')) {
-    currentViewMode = 'Editor';
     return true;
   }
 
   if (url.includes('preview.wix.com')) {
-    currentViewMode = 'Preview';
     return true;
   }
 
-  currentViewMode = 'Site';
   return false;
 };
 

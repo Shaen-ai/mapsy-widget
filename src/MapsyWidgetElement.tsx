@@ -5,7 +5,8 @@ import {
   setCompId,
   setInstanceToken,
   getWixClient,
-  getAccessTokenListener
+  getAccessTokenListener,
+  setViewModeFromWixConfig
 } from './services/api';
 
 /**
@@ -74,7 +75,8 @@ class MapsyWidgetElement extends HTMLElement {
       'primary-color', 'primarycolor',
       'show-widget-name', 'showwidgetname',
       'widget-name', 'widgetname',
-      'api-url', 'compid', 'comp-id', 'instance', 'config', 'auth'
+      'api-url', 'compid', 'comp-id', 'instance', 'config', 'auth',
+      'wixconfig' // ✅ Wix official: ViewMode is here
     ];
   }
 
@@ -111,6 +113,9 @@ class MapsyWidgetElement extends HTMLElement {
       }
       console.log('[Widget] Element attributes:', attrs.join(', ') || 'none');
 
+      // ✅ WIX OFFICIAL: Read ViewMode from wixconfig attribute
+      this.readWixConfig();
+
       try {
         this.updateConfigFromAttributes();
         this.mountReactApp();
@@ -142,6 +147,12 @@ class MapsyWidgetElement extends HTMLElement {
     if (oldValue === newValue || newValue === null) return;
 
     console.log(`[Widget] ✅ Attribute changed: ${name} = ${newValue} (old: ${oldValue})`);
+
+    // ✅ WIX OFFICIAL: Handle wixconfig attribute for ViewMode detection
+    if (name === 'wixconfig') {
+      this.readWixConfig();
+      return;
+    }
 
     switch (name) {
       case 'default-view':
@@ -221,6 +232,32 @@ class MapsyWidgetElement extends HTMLElement {
     if (this.root && this.isConnected && this._initialized) {
       console.log(`[Widget] 🔄 Re-rendering with config:`, this.config);
       this.mountReactApp();
+    }
+  }
+
+  /**
+   * ✅ WIX OFFICIAL: Read ViewMode from wixconfig attribute
+   * Per Wix documentation: wixconfig contains ViewMode property
+   */
+  private readWixConfig() {
+    try {
+      const wixconfigAttr = this.getAttribute('wixconfig');
+      if (!wixconfigAttr) {
+        console.log('[Widget] No wixconfig attribute found');
+        return;
+      }
+
+      const wixconfig = JSON.parse(wixconfigAttr);
+      const viewMode = wixconfig?.ViewMode as 'Editor' | 'Preview' | 'Site' | undefined;
+
+      if (viewMode) {
+        console.log('[Widget] 🔍 ViewMode from wixconfig:', viewMode);
+        setViewModeFromWixConfig(viewMode);
+      } else {
+        console.log('[Widget] ⚠️ wixconfig attribute present but no ViewMode found');
+      }
+    } catch (error) {
+      console.error('[Widget] ❌ Error parsing wixconfig:', error);
     }
   }
 
