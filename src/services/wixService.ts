@@ -291,7 +291,7 @@ export const setInstanceToken = (token: string): void => {
 export const isInEditorMode = (): boolean => {
   // Check URL patterns that indicate editor or preview mode
   const url = window.location.href.toLowerCase();
-
+console.log('url detected',url);
   if (url.includes('editor.wix.com')) {
     return true;
   }
