@@ -59,32 +59,49 @@ class MapsyWidgetElement extends HTMLElement {
 
   connectedCallback() {
     if (this._initialized) return;
-    this._initialized = true;
 
-    // Debug: Log all attributes on the element
-    const attrs: string[] = [];
-    for (let i = 0; i < this.attributes.length; i++) {
-      const attr = this.attributes[i];
-      attrs.push(`${attr.name}="${attr.value.substring(0, 50)}"`);
-    }
-    console.log('[Widget] Element attributes:', attrs.join(', ') || 'none');
+    // Add a small delay to ensure we're in a stable DOM state
+    // This helps prevent race conditions with Wix editor's preview system
+    requestAnimationFrame(() => {
+      if (this._initialized) return;
+      this._initialized = true;
 
-    try {
-      this.updateConfigFromAttributes();
-      this.mountReactApp();
-    } catch (error) {
-      console.error('[Widget] Mount error:', error);
-    }
+      // Debug: Log all attributes on the element
+      const attrs: string[] = [];
+      for (let i = 0; i < this.attributes.length; i++) {
+        const attr = this.attributes[i];
+        attrs.push(`${attr.name}="${attr.value.substring(0, 50)}"`);
+      }
+      console.log('[Widget] Element attributes:', attrs.join(', ') || 'none');
+
+      try {
+        this.updateConfigFromAttributes();
+        this.mountReactApp();
+      } catch (error) {
+        console.error('[Widget] Mount error:', error);
+      }
+    });
   }
 
   disconnectedCallback() {
-    if (this.root) {
-      this.root.unmount();
-      this.root = null;
+    try {
+      if (this.root) {
+        this.root.unmount();
+        this.root = null;
+      }
+      this._initialized = false;
+    } catch (error) {
+      console.error('[Widget] Disconnect error:', error);
     }
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
+    // Defensive check: ensure we're still in a valid state
+    if (!this.shadowRoot) {
+      console.warn('[Widget] attributeChangedCallback called before shadowRoot initialized');
+      return;
+    }
+
     if (oldValue === newValue || newValue === null) return;
 
     console.log(`[Widget] ✅ Attribute changed: ${name} = ${newValue} (old: ${oldValue})`);
@@ -163,7 +180,8 @@ class MapsyWidgetElement extends HTMLElement {
         break;
     }
 
-    if (this.root) {
+    // Only re-render if we're initialized and still connected to the DOM
+    if (this.root && this.isConnected && this._initialized) {
       console.log(`[Widget] 🔄 Re-rendering with config:`, this.config);
       this.mountReactApp();
     }
@@ -201,6 +219,12 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   private mountReactApp() {
+    // Safety check: ensure we're in a valid state
+    if (!this.shadowRoot || !this.isConnected) {
+      console.warn('[Widget] mountReactApp called in invalid state');
+      return;
+    }
+
     // Only set up shadow DOM once
     if (!this.container && this.shadowRoot) {
       // Create container for React app
