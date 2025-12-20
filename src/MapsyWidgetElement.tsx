@@ -268,9 +268,27 @@ class MapsyWidgetElement extends HTMLElement {
     }
   }
 
+  // DEPRECATED: Old method that uses setAttribute (inefficient)
   public setProp(property: string, value: any) {
     const attrName = property.replace(/([A-Z])/g, '-$1').toLowerCase();
     this.setAttribute(attrName, String(value));
+  }
+
+  // ✅ NEW: Direct config update without setAttribute
+  public updateConfig(newConfig: Partial<typeof this.config>) {
+    // Directly update internal config state
+    this.config = { ...this.config, ...newConfig };
+
+    // Re-render if already initialized
+    if (this.root && this.isConnected && this._initialized) {
+      console.log('[Widget] 🔄 Config updated directly:', this.config);
+      this.mountReactApp();
+    }
+  }
+
+  // ✅ NEW: Set entire config object at once
+  public setConfig(config: Partial<typeof this.config>) {
+    this.updateConfig(config);
   }
 
   public getConfig() {

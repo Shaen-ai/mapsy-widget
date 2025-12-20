@@ -73,34 +73,40 @@ class MapsyWidget {
   }
 
   private static createWidget(element: HTMLElement, config?: any) {
+    // Defensive check: ensure element exists
+    if (!element) {
+      console.error('[MapsyWidget] Cannot create widget: element is null or undefined');
+      return;
+    }
 
     // If element is already a mapsy-widget, just update its config
     if (element.tagName.toLowerCase() === 'mapsy-widget') {
       if (config) {
-        // Update attributes based on config
-        if (config.apiUrl) element.setAttribute('api-url', config.apiUrl);
-        if (config.defaultView) element.setAttribute('default-view', config.defaultView);
-        if (config.showHeader !== undefined) element.setAttribute('show-header', String(config.showHeader));
-        if (config.headerTitle) element.setAttribute('header-title', config.headerTitle);
-        if (config.mapZoomLevel) element.setAttribute('map-zoom-level', String(config.mapZoomLevel));
-        if (config.primaryColor) element.setAttribute('primary-color', config.primaryColor);
-        if (config.compId) element.setAttribute('compid', config.compId);
+        // ✅ NEW: Use direct method API instead of setAttribute
+        // This updates state directly without string conversion
+        const widgetElement = element as any;
+        if (typeof widgetElement.setConfig === 'function') {
+          widgetElement.setConfig(config);
+        } else {
+          // Fallback to setAttribute for backwards compatibility
+          element.setAttribute('config', JSON.stringify(config));
+        }
       }
       return;
     }
 
     // Otherwise, create a new mapsy-widget element inside
-    const widget = document.createElement('mapsy-widget');
+    const widget = document.createElement('mapsy-widget') as any;
 
-    // Apply configuration as attributes
+    // Apply configuration using direct method API if available
     if (config) {
-      if (config.apiUrl) widget.setAttribute('api-url', config.apiUrl);
-      if (config.defaultView) widget.setAttribute('default-view', config.defaultView);
-      if (config.showHeader !== undefined) widget.setAttribute('show-header', String(config.showHeader));
-      if (config.headerTitle) widget.setAttribute('header-title', config.headerTitle);
-      if (config.mapZoomLevel) widget.setAttribute('map-zoom-level', String(config.mapZoomLevel));
-      if (config.primaryColor) widget.setAttribute('primary-color', config.primaryColor);
-      if (config.compId) widget.setAttribute('compid', config.compId);
+      // Wait for element to be connected and initialized
+      if (typeof widget.setConfig === 'function') {
+        widget.setConfig(config);
+      } else {
+        // Set as attribute initially, will be parsed on connection
+        widget.setAttribute('config', JSON.stringify(config));
+      }
     }
 
     // Clear element and add widget
