@@ -44,6 +44,27 @@ class MapsyWidgetElement extends HTMLElement {
     console.log('[MapsyWidget] Constructor - accessTokenListener stored:', !!this.accessTokenListener);
   }
 
+  // ✅ OVERRIDE: Add defensive wrapper around setAttribute
+  // This prevents Wix editor from crashing when trying to set attributes on a detached element
+  setAttribute(name: string, value: string): void {
+    try {
+      // Check if we're still connected to the DOM before setting attributes
+      if (!this.isConnected && !this.shadowRoot) {
+        console.warn(`[Widget] setAttribute('${name}') called on detached element, deferring...`);
+        // Defer the setAttribute until the element is connected
+        requestAnimationFrame(() => {
+          if (this.isConnected) {
+            super.setAttribute(name, value);
+          }
+        });
+        return;
+      }
+      super.setAttribute(name, value);
+    } catch (error) {
+      console.error(`[Widget] setAttribute('${name}') error:`, error);
+    }
+  }
+
   static get observedAttributes() {
     return [
       'default-view', 'defaultview',
@@ -58,12 +79,28 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   connectedCallback() {
-    if (this._initialized) return;
+    // Allow reconnection if element was disconnected (e.g., moved in DOM by Wix editor)
+    if (this._initialized && !this.root) {
+      console.log('[Widget] Element reconnected after being disconnected');
+      this._initialized = false; // Reset to allow re-initialization
+    }
+
+    if (this._initialized) {
+      console.log('[Widget] Already initialized, skipping connectedCallback');
+      return;
+    }
 
     // Add a small delay to ensure we're in a stable DOM state
     // This helps prevent race conditions with Wix editor's preview system
     requestAnimationFrame(() => {
       if (this._initialized) return;
+
+      // Double-check we're still connected after the delay
+      if (!this.isConnected) {
+        console.warn('[Widget] Element disconnected before initialization completed');
+        return;
+      }
+
       this._initialized = true;
 
       // Debug: Log all attributes on the element
