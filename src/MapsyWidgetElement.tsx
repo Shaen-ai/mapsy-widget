@@ -162,15 +162,22 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
+    console.log(`[Widget] 🔔 attributeChangedCallback called: ${name}`);
+    console.log('[Widget] Old value:', oldValue);
+    console.log('[Widget] New value:', newValue);
+
     // Defensive check: ensure we're still in a valid state
     if (!this.shadowRoot) {
       console.warn('[Widget] attributeChangedCallback called before shadowRoot initialized');
       return;
     }
 
-    if (oldValue === newValue || newValue === null) return;
+    if (oldValue === newValue || newValue === null) {
+      console.log('[Widget] ⏭️  Skipping - old === new or new is null');
+      return;
+    }
 
-    console.log(`[Widget] ✅ Attribute changed: ${name} = ${newValue} (old: ${oldValue})`);
+    console.log(`[Widget] ✅ Processing attribute change: ${name}`);
 
     // ✅ WIX OFFICIAL: Handle wixconfig attribute for ViewMode detection
     if (name === 'wixconfig') {
