@@ -43,6 +43,29 @@ class MapsyWidgetElement extends HTMLElement {
 
     console.log('[MapsyWidget] Constructor - Wix client:', !!getWixClient());
     console.log('[MapsyWidget] Constructor - accessTokenListener stored:', !!this.accessTokenListener);
+
+    // Listen for config updates from settings panel via postMessage
+    this.setupPostMessageListener();
+  }
+
+  private setupPostMessageListener() {
+    window.addEventListener('message', (event) => {
+      // Security check: verify message type
+      if (event.data?.type === 'MAPSY_CONFIG_UPDATE' && event.data?.source === 'settings-panel') {
+        console.log('[Widget] 📨 Received config update via postMessage:', event.data.config);
+
+        // Update internal config
+        const { auth, ...configWithoutAuth } = event.data.config;
+        this.config = { ...this.config, ...configWithoutAuth };
+
+        // Re-render if initialized
+        if (this.root && this.isConnected && this._initialized) {
+          console.log('[Widget] 🔄 Applying config from postMessage:', this.config);
+          this.mountReactApp();
+        }
+      }
+    });
+    console.log('[Widget] ✅ PostMessage listener set up');
   }
 
   // ✅ OVERRIDE: Add defensive wrapper around setAttribute
