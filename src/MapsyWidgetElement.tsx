@@ -237,27 +237,18 @@ class MapsyWidgetElement extends HTMLElement {
 
   /**
    * ✅ WIX OFFICIAL: Read ViewMode from wixconfig attribute
-   * Per Wix documentation: wixconfig contains ViewMode property
+   * Per Wix documentation: this is the official way to access ViewMode
    */
   private readWixConfig() {
-    try {
-      const wixconfigAttr = this.getAttribute('wixconfig');
-      if (!wixconfigAttr) {
-        console.log('[Widget] No wixconfig attribute found');
-        return;
-      }
+    // Wix official pattern for reading ViewMode
+    const wixconfig = JSON.parse((this as any)?.attributes?.wixconfig?.value ?? '{}');
+    const viewMode = wixconfig?.ViewMode as 'Editor' | 'Preview' | 'Site' | undefined;
 
-      const wixconfig = JSON.parse(wixconfigAttr);
-      const viewMode = wixconfig?.ViewMode as 'Editor' | 'Preview' | 'Site' | undefined;
-
-      if (viewMode) {
-        console.log('[Widget] 🔍 ViewMode from wixconfig:', viewMode);
-        setViewModeFromWixConfig(viewMode);
-      } else {
-        console.log('[Widget] ⚠️ wixconfig attribute present but no ViewMode found');
-      }
-    } catch (error) {
-      console.error('[Widget] ❌ Error parsing wixconfig:', error);
+    if (viewMode) {
+      console.log('[Widget] 🔍 ViewMode from wixconfig:', viewMode);
+      setViewModeFromWixConfig(viewMode);
+    } else {
+      console.log('[Widget] ⚠️ No ViewMode found in wixconfig');
     }
   }
 
