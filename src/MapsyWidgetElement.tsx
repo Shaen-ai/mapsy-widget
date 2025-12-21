@@ -236,23 +236,34 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   /**
-   * ✅ WIX OFFICIAL: Read ViewMode from wixconfig attribute
-   * Per Wix documentation: this is the official way to access ViewMode
+   * ✅ WIX OFFICIAL: Read ViewMode from wixconfig attribute with URL fallback
+   * Per Wix documentation: wixconfig is the official way to access ViewMode
    */
   private readWixConfig() {
     // Wix official pattern for reading ViewMode
-    const consoleCongig =  (this as any)?.attributes;
     const wixconfig = JSON.parse((this as any)?.attributes?.wixconfig?.value ?? '{}');
-
-    console.log('wixconfigwixconfig',wixconfig);
-    console.log('consoleCongigconsoleCongig',consoleCongig);
     const viewMode = wixconfig?.ViewMode as 'Editor' | 'Preview' | 'Site' | undefined;
 
     if (viewMode) {
       console.log('[Widget] 🔍 ViewMode from wixconfig:', viewMode);
       setViewModeFromWixConfig(viewMode);
     } else {
-      console.log('[Widget] ⚠️ No ViewMode found in wixconfig');
+      // Fallback: Detect editor mode from URL
+      console.log('[Widget] ⚠️ No ViewMode in wixconfig, checking URL...');
+      const url = window.location.href.toLowerCase();
+
+      if (url.includes('editor.wix.com') ||
+          url.includes('editor-x.wix.com') ||
+          url.includes('static.parastorage.com')) {
+        console.log('[Widget] 🔍 Editor mode detected from URL:', url);
+        setViewModeFromWixConfig('Editor');
+      } else if (url.includes('preview.wix.com')) {
+        console.log('[Widget] 🔍 Preview mode detected from URL:', url);
+        setViewModeFromWixConfig('Preview');
+      } else {
+        console.log('[Widget] 🔍 Site mode (default)');
+        setViewModeFromWixConfig('Site');
+      }
     }
   }
 
