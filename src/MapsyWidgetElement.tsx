@@ -126,6 +126,7 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   disconnectedCallback() {
+    console.warn('[Widget] ⚠️ Element disconnected - this should not happen during config updates!');
     try {
       if (this.root) {
         this.root.unmount();

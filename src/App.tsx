@@ -25,7 +25,7 @@ interface AppProps {
 function App({ config: externalConfig }: AppProps = {}) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true); // Renamed from 'loading' for clarity
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
   const [currentView, setCurrentView] = useState<'map' | 'list'>('map');
@@ -61,17 +61,23 @@ function App({ config: externalConfig }: AppProps = {}) {
   // Apply external config changes without re-fetching from API
   useEffect(() => {
     if (externalConfig) {
+      console.log('[Widget] 🔄 External config changed, updating preview...', externalConfig);
       setConfig(prev => ({ ...prev, ...externalConfig }));
       if (externalConfig.defaultView) {
         setCurrentView(externalConfig.defaultView);
       }
+      // If we receive external config and already have data, we're not initializing anymore
+      // This prevents the spinner from showing when settings panel makes live preview changes
+      if (initializing && locations.length > 0) {
+        setInitializing(false);
+      }
     }
-  }, [externalConfig]);
+  }, [externalConfig, initializing, locations.length]);
 
   // Fetch both config and locations in a single request
   const fetchWidgetData = async () => {
     try {
-      setLoading(true);
+      setInitializing(true);
       const { config: configData, locations: locationsData } = await widgetDataService.getData();
 
       // Set locations
@@ -100,7 +106,7 @@ function App({ config: externalConfig }: AppProps = {}) {
       console.error('[Widget Data] ❌', (error as Error)?.message);
       setCurrentView(config.defaultView || 'map');
     } finally {
-      setLoading(false);
+      setInitializing(false);
     }
   };
 
@@ -127,7 +133,7 @@ function App({ config: externalConfig }: AppProps = {}) {
     return null;
   }
 
-  if (loading) {
+  if (initializing) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
