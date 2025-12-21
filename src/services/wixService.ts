@@ -119,6 +119,14 @@ const extractCompIdFromElement = (): string | null => {
       console.log('[Wix] ✅ CompId from widget attribute:', wixCompId);
       return wixCompId;
     }
+
+    // Check if the widget element itself has an id starting with 'comp-'
+    // This is how Wix assigns component IDs in the editor
+    const widgetId = widget.id;
+    if (widgetId && widgetId.startsWith('comp-')) {
+      console.log('[Wix] ✅ CompId from widget element id:', widgetId);
+      return widgetId;
+    }
   }
 
   // Check for comp id in any element on the page
@@ -207,35 +215,53 @@ const initializeWixData = async (): Promise<void> => {
   console.log('[WixInit] 📍 Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
   console.log('[WixInit] 🔐 Wix client available:', !!wixClient);
   console.log('[WixInit] 🔐 Access token listener stored:', !!accessTokenListener);
+  console.log('[WixInit] 📦 CompId already set:', compId || 'NOT SET');
 
-  // 1. Check URL parameters (compId may be passed as URL param)
-  const urlCompId = extractCompIdFromUrl();
-  const urlInstance = extractInstanceFromUrl();
-
-  if (urlCompId) {
-    compId = urlCompId;
-    console.log('[WixInit] ✅ CompId from URL:', compId);
-  }
-  if (urlInstance) {
-    instanceToken = urlInstance;
-    console.log('[WixInit] ✅ Instance from URL');
-  }
-
-  // 2. Check DOM elements for compId (saved by settings panel via widget.setProp)
+  // Only try to extract compId if it hasn't been set yet (via setCompId from widget element)
   if (!compId) {
-    const elementCompId = extractCompIdFromElement();
-    if (elementCompId) {
-      compId = elementCompId;
+    // 1. Check URL parameters (compId may be passed as URL param)
+    const urlCompId = extractCompIdFromUrl();
+    if (urlCompId) {
+      compId = urlCompId;
+      console.log('[WixInit] ✅ CompId from URL:', compId);
     }
+
+    // 2. Check DOM elements for compId (saved by settings panel via widget.setProp)
+    if (!compId) {
+      const elementCompId = extractCompIdFromElement();
+      if (elementCompId) {
+        compId = elementCompId;
+        console.log('[WixInit] ✅ CompId from DOM element:', compId);
+      }
+    }
+
+    // 3. Check Wix window globals (for fallback/legacy support)
+    if (!compId) {
+      const wixGlobals = extractInstanceFromWixGlobals();
+      if (wixGlobals.compId) {
+        compId = wixGlobals.compId;
+        console.log('[WixInit] ✅ CompId from window globals:', compId);
+      }
+    }
+  } else {
+    console.log('[WixInit] ⏭️  CompId already set (skipping extraction):', compId);
   }
 
-  // 3. Check Wix window globals (for fallback/legacy support)
-  const wixGlobals = extractInstanceFromWixGlobals();
-  if (!instanceToken && wixGlobals.instance) {
-    instanceToken = wixGlobals.instance;
-  }
-  if (!compId && wixGlobals.compId) {
-    compId = wixGlobals.compId;
+  // Extract instanceToken if not already set
+  if (!instanceToken) {
+    const urlInstance = extractInstanceFromUrl();
+    if (urlInstance) {
+      instanceToken = urlInstance;
+      console.log('[WixInit] ✅ Instance from URL');
+    }
+
+    if (!instanceToken) {
+      const wixGlobals = extractInstanceFromWixGlobals();
+      if (wixGlobals.instance) {
+        instanceToken = wixGlobals.instance;
+        console.log('[WixInit] ✅ Instance from window globals');
+      }
+    }
   }
 
   // Final summary
