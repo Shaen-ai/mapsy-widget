@@ -241,7 +241,7 @@ class MapsyWidgetElement extends HTMLElement {
    */
   private readWixConfig() {
     // Wix official pattern for reading ViewMode
-    const consoleCongig =  JSON.parse((this as any)?.attributes);
+    const consoleCongig =  (this as any)?.attributes;
     const wixconfig = JSON.parse((this as any)?.attributes?.wixconfig?.value ?? '{}');
 
     console.log('wixconfigwixconfig',wixconfig);
