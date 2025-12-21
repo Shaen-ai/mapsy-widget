@@ -49,23 +49,60 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   private setupPostMessageListener() {
+    // ✅ WIX OFFICIAL: Listen for property changes via postMessage from Wix
+    // Wix sends property updates to custom elements via postMessage
     window.addEventListener('message', (event) => {
-      // Security check: verify message type
-      if (event.data?.type === 'MAPSY_CONFIG_UPDATE' && event.data?.source === 'settings-panel') {
-        console.log('[Widget] 📨 Received config update via postMessage:', event.data.config);
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
 
-        // Update internal config
-        const { auth, ...configWithoutAuth } = event.data.config;
-        this.config = { ...this.config, ...configWithoutAuth };
+        // Wix sends property updates with type 'props' or 'propsChanged'
+        if (data?.type === 'props' || data?.type === 'propsChanged') {
+          console.log('[Widget] 📨 Received props update from Wix:', data);
 
-        // Re-render if initialized
-        if (this.root && this.isConnected && this._initialized) {
-          console.log('[Widget] 🔄 Applying config from postMessage:', this.config);
-          this.mountReactApp();
+          // Extract config properties from Wix props
+          const props = data.props || data;
+          const configUpdate: any = {};
+
+          if (props['default-view']) configUpdate.defaultView = props['default-view'];
+          if (props['show-header']) configUpdate.showHeader = props['show-header'] === 'true';
+          if (props['header-title']) configUpdate.headerTitle = props['header-title'];
+          if (props['map-zoom-level']) configUpdate.mapZoomLevel = parseInt(props['map-zoom-level'], 10);
+          if (props['primary-color']) configUpdate.primaryColor = props['primary-color'];
+          if (props['show-widget-name']) configUpdate.showWidgetName = props['show-widget-name'] === 'true';
+          if (props['widget-name']) configUpdate.widgetName = props['widget-name'];
+
+          if (Object.keys(configUpdate).length > 0) {
+            console.log('[Widget] 🔄 Updating config from Wix props:', configUpdate);
+            this.config = { ...this.config, ...configUpdate };
+
+            // Re-render if initialized
+            if (this.root && this.isConnected && this._initialized) {
+              console.log('[Widget] 🔄 Re-rendering with Wix props');
+              this.mountReactApp();
+            }
+          }
         }
+
+        // Legacy: Keep support for custom postMessage format
+        if (event.data?.type === 'MAPSY_CONFIG_UPDATE' && event.data?.source === 'settings-panel') {
+          console.log('[Widget] 📨 Received config update via postMessage:', event.data.config);
+
+          // Update internal config
+          const { auth, ...configWithoutAuth } = event.data.config;
+          this.config = { ...this.config, ...configWithoutAuth };
+
+          // Re-render if initialized
+          if (this.root && this.isConnected && this._initialized) {
+            console.log('[Widget] 🔄 Applying config from postMessage:', this.config);
+            this.mountReactApp();
+          }
+        }
+      } catch (e) {
+        // Ignore parsing errors
       }
     });
-    console.log('[Widget] ✅ PostMessage listener set up');
+
+    console.log('[Widget] ✅ Wix property listeners set up');
   }
 
   // ✅ OVERRIDE: Add defensive wrapper around setAttribute
