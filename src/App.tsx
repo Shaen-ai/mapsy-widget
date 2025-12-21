@@ -66,13 +66,9 @@ function App({ config: externalConfig }: AppProps = {}) {
       if (externalConfig.defaultView) {
         setCurrentView(externalConfig.defaultView);
       }
-      // If we receive external config and already have data, we're not initializing anymore
-      // This prevents the spinner from showing when settings panel makes live preview changes
-      if (initializing && locations.length > 0) {
-        setInitializing(false);
-      }
     }
-  }, [externalConfig, initializing, locations.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalConfig]);
 
   // Fetch both config and locations in a single request
   const fetchWidgetData = async () => {
