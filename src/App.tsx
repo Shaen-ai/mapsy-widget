@@ -63,14 +63,7 @@ function App({ config: externalConfig }: AppProps = {}) {
   useEffect(() => {
     if (externalConfig && Object.keys(externalConfig).length > 0) {
       console.log('[Widget] 🔄 External config changed, updating preview...', externalConfig);
-      setConfig(prev => {
-        const newConfig = { ...prev, ...externalConfig };
-        // Only update if something actually changed
-        if (JSON.stringify(prev) !== JSON.stringify(newConfig)) {
-          return newConfig;
-        }
-        return prev;
-      });
+      setConfig(prev => ({ ...prev, ...externalConfig }));
       if (externalConfig.defaultView && externalConfig.defaultView !== currentView) {
         setCurrentView(externalConfig.defaultView);
       }
@@ -83,6 +76,7 @@ function App({ config: externalConfig }: AppProps = {}) {
     externalConfig?.primaryColor,
     externalConfig?.showWidgetName,
     externalConfig?.widgetName,
+    currentView,
   ]);
 
   // Fetch both config and locations in a single request
