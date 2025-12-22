@@ -21,6 +21,7 @@ class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
   private container: HTMLDivElement | null = null;
   public _initialized: boolean = false;
+  private _configFetched: boolean = false; // Track if we've fetched config from backend
   // Store access token listener as per Wix example
   private accessTokenListener: any = null;
   private config = {
@@ -181,27 +182,32 @@ class MapsyWidgetElement extends HTMLElement {
         // First, read compId and instance from attributes (needed for API calls)
         this.updateConfigFromAttributes();
 
-        // Fetch configuration from backend
-        console.log('[Widget] 🔄 Fetching config from backend...');
-        try {
-          const data = await widgetDataService.getData();
-          if (data.config) {
-            // Merge backend config with current config
-            this.config = {
-              ...this.config,
-              defaultView: data.config.defaultView ?? this.config.defaultView,
-              showHeader: data.config.showHeader ?? this.config.showHeader,
-              headerTitle: data.config.headerTitle ?? this.config.headerTitle,
-              mapZoomLevel: data.config.mapZoomLevel ?? this.config.mapZoomLevel,
-              primaryColor: data.config.primaryColor ?? this.config.primaryColor,
-              showWidgetName: data.config.showWidgetName ?? this.config.showWidgetName,
-              widgetName: data.config.widgetName ?? this.config.widgetName,
-            };
-            console.log('[Widget] ✅ Loaded config from backend:', this.config);
+        // Fetch configuration from backend ONLY on first load
+        if (!this._configFetched) {
+          console.log('[Widget] 🔄 Fetching config from backend (first load)...');
+          try {
+            const data = await widgetDataService.getData();
+            if (data.config) {
+              // Merge backend config with current config
+              this.config = {
+                ...this.config,
+                defaultView: data.config.defaultView ?? this.config.defaultView,
+                showHeader: data.config.showHeader ?? this.config.showHeader,
+                headerTitle: data.config.headerTitle ?? this.config.headerTitle,
+                mapZoomLevel: data.config.mapZoomLevel ?? this.config.mapZoomLevel,
+                primaryColor: data.config.primaryColor ?? this.config.primaryColor,
+                showWidgetName: data.config.showWidgetName ?? this.config.showWidgetName,
+                widgetName: data.config.widgetName ?? this.config.widgetName,
+              };
+              console.log('[Widget] ✅ Loaded config from backend:', this.config);
+            }
+            this._configFetched = true; // Mark as fetched
+          } catch (error) {
+            console.warn('[Widget] ⚠️ Could not fetch config from backend, using defaults:', error);
+            this._configFetched = true; // Mark as attempted even if failed
           }
-        } catch (error) {
-          console.warn('[Widget] ⚠️ Could not fetch config from backend, using defaults:', error);
-          // Continue with default config
+        } else {
+          console.log('[Widget] ℹ️ Config already fetched, skipping backend call');
         }
 
         // Mount React app with loaded config
