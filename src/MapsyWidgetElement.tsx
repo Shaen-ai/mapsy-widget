@@ -6,7 +6,8 @@ import {
   setInstanceToken,
   getWixClient,
   getAccessTokenListener,
-  setViewModeFromWixConfig
+  setViewModeFromWixConfig,
+  widgetDataService
 } from './services/api';
 
 /**
@@ -154,7 +155,7 @@ class MapsyWidgetElement extends HTMLElement {
 
     // Add a small delay to ensure we're in a stable DOM state
     // This helps prevent race conditions with Wix editor's preview system
-    requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
       if (this._initialized) return;
 
       // Double-check we're still connected after the delay
@@ -177,7 +178,33 @@ class MapsyWidgetElement extends HTMLElement {
       this.readWixConfig();
 
       try {
+        // First, read compId and instance from attributes (needed for API calls)
         this.updateConfigFromAttributes();
+
+        // Fetch configuration from backend
+        console.log('[Widget] 🔄 Fetching config from backend...');
+        try {
+          const data = await widgetDataService.getData();
+          if (data.config) {
+            // Merge backend config with current config
+            this.config = {
+              ...this.config,
+              defaultView: data.config.defaultView ?? this.config.defaultView,
+              showHeader: data.config.showHeader ?? this.config.showHeader,
+              headerTitle: data.config.headerTitle ?? this.config.headerTitle,
+              mapZoomLevel: data.config.mapZoomLevel ?? this.config.mapZoomLevel,
+              primaryColor: data.config.primaryColor ?? this.config.primaryColor,
+              showWidgetName: data.config.showWidgetName ?? this.config.showWidgetName,
+              widgetName: data.config.widgetName ?? this.config.widgetName,
+            };
+            console.log('[Widget] ✅ Loaded config from backend:', this.config);
+          }
+        } catch (error) {
+          console.warn('[Widget] ⚠️ Could not fetch config from backend, using defaults:', error);
+          // Continue with default config
+        }
+
+        // Mount React app with loaded config
         this.mountReactApp();
       } catch (error) {
         console.error('[Widget] Mount error:', error);
