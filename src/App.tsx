@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
 import { Location } from './types/location';
@@ -59,16 +59,31 @@ function App({ config: externalConfig }: AppProps = {}) {
   }, []);
 
   // Apply external config changes without re-fetching from API
+  // Only update when actual config values change, not on every render
   useEffect(() => {
-    if (externalConfig) {
+    if (externalConfig && Object.keys(externalConfig).length > 0) {
       console.log('[Widget] 🔄 External config changed, updating preview...', externalConfig);
-      setConfig(prev => ({ ...prev, ...externalConfig }));
-      if (externalConfig.defaultView) {
+      setConfig(prev => {
+        const newConfig = { ...prev, ...externalConfig };
+        // Only update if something actually changed
+        if (JSON.stringify(prev) !== JSON.stringify(newConfig)) {
+          return newConfig;
+        }
+        return prev;
+      });
+      if (externalConfig.defaultView && externalConfig.defaultView !== currentView) {
         setCurrentView(externalConfig.defaultView);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalConfig]);
+  }, [
+    externalConfig?.defaultView,
+    externalConfig?.showHeader,
+    externalConfig?.headerTitle,
+    externalConfig?.mapZoomLevel,
+    externalConfig?.primaryColor,
+    externalConfig?.showWidgetName,
+    externalConfig?.widgetName,
+  ]);
 
   // Fetch both config and locations in a single request
   const fetchWidgetData = async () => {
@@ -106,7 +121,7 @@ function App({ config: externalConfig }: AppProps = {}) {
     }
   };
 
-  const handleLocationSelect = (location: Location) => {
+  const handleLocationSelect = useCallback((location: Location) => {
     setSelectedLocation(location);
 
     // If in map view, find and trigger click on the corresponding marker
@@ -122,7 +137,24 @@ function App({ config: externalConfig }: AppProps = {}) {
         mapInstance.setZoom(16);
       }
     }
-  };
+  }, [currentView, locations, markers, mapInstance]);
+
+  const handleViewChange = useCallback((view: 'map' | 'list') => {
+    setCurrentView(view);
+  }, []);
+
+  // Memoize config values to prevent unnecessary re-renders
+  const memoizedConfig = useMemo(() => ({
+    ...config,
+  }), [
+    config.defaultView,
+    config.showHeader,
+    config.headerTitle,
+    config.mapZoomLevel,
+    config.primaryColor,
+    config.showWidgetName,
+    config.widgetName,
+  ]);
 
   // Hide widget on published site without premium
   if (shouldHideWidget) {
@@ -162,41 +194,41 @@ function App({ config: externalConfig }: AppProps = {}) {
       )}
 
       {/* Widget Name Display */}
-      {config.showWidgetName && config.widgetName && (
+      {memoizedConfig.showWidgetName && memoizedConfig.widgetName && (
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2">
           <h1 className="text-white font-semibold text-center">
-            {config.widgetName}
+            {memoizedConfig.widgetName}
           </h1>
         </div>
       )}
 
-      {config.showHeader && (
+      {memoizedConfig.showHeader && (
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-4 py-3 flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-900">
-              {config.headerTitle || 'Our Locations'}
+              {memoizedConfig.headerTitle || 'Our Locations'}
             </h2>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentView('map')}
+                onClick={() => handleViewChange('map')}
                 className={`px-3 py-1.5 rounded-lg flex items-center gap-2 transition ${
                   currentView === 'map'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
-                style={currentView === 'map' ? { backgroundColor: config.primaryColor } : {}}
+                style={currentView === 'map' ? { backgroundColor: memoizedConfig.primaryColor } : {}}
               >
                 <FiMap size={16} />
                 <span className="hidden sm:inline">Map</span>
               </button>
               <button
-                onClick={() => setCurrentView('list')}
+                onClick={() => handleViewChange('list')}
                 className={`px-3 py-1.5 rounded-lg flex items-center gap-2 transition ${
                   currentView === 'list'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
-                style={currentView === 'list' ? { backgroundColor: config.primaryColor } : {}}
+                style={currentView === 'list' ? { backgroundColor: memoizedConfig.primaryColor } : {}}
               >
                 <FiList size={16} />
                 <span className="hidden sm:inline">List</span>
@@ -210,7 +242,7 @@ function App({ config: externalConfig }: AppProps = {}) {
         {currentView === 'map' ? (
           <MapView
             locations={locations}
-            mapZoomLevel={config.mapZoomLevel}
+            mapZoomLevel={memoizedConfig.mapZoomLevel}
             onMapLoad={setMapInstance}
             onMarkersLoad={setMarkers}
             onMarkerClick={setSelectedLocation}
@@ -220,7 +252,7 @@ function App({ config: externalConfig }: AppProps = {}) {
             locations={locations}
             selectedLocation={selectedLocation}
             onLocationSelect={handleLocationSelect}
-            primaryColor={config.primaryColor}
+            primaryColor={memoizedConfig.primaryColor}
           />
         )}
       </div>

@@ -143,10 +143,15 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   connectedCallback() {
-    // Allow reconnection if element was disconnected (e.g., moved in DOM by Wix editor)
+    // Handle reconnection after disconnect (e.g., moved in DOM by Wix editor)
     if (this._initialized && !this.root) {
-      console.log('[Widget] Element reconnected after being disconnected');
-      this._initialized = false; // Reset to allow re-initialization
+      console.log('[Widget] 🔄 Element reconnected - remounting React app only');
+      requestAnimationFrame(() => {
+        if (this.isConnected) {
+          this.mountReactApp();
+        }
+      });
+      return;
     }
 
     if (this._initialized) {
@@ -219,13 +224,14 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   disconnectedCallback() {
-    console.warn('[Widget] ⚠️ Element disconnected - this should not happen during config updates!');
+    console.warn('[Widget] ⚠️ Element disconnected');
     try {
       if (this.root) {
         this.root.unmount();
         this.root = null;
       }
-      this._initialized = false;
+      // Don't reset _initialized or _configFetched to preserve state
+      // This allows quick reconnection without re-fetching from backend
     } catch (error) {
       console.error('[Widget] Disconnect error:', error);
     }
@@ -246,8 +252,8 @@ class MapsyWidgetElement extends HTMLElement {
 
     // ✅ WIX OFFICIAL: Handle wixconfig attribute for ViewMode detection
     if (name === 'wixconfig') {
-      this.readWixConfig();
-      return;
+      // this.readWixConfig();
+      // return;
     }
 
     // Track which config property was updated
