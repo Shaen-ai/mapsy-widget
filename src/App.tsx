@@ -2,118 +2,54 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import MapView from './components/MapView';
 import ListView from './components/ListView';
 import { Location } from './types/location';
-import { widgetDataService, initializeApi, getViewMode } from './services/api';
+import { initializeApi } from './services/api';
 import { FiMap, FiList } from 'react-icons/fi';
-
-type PremiumPlanName = 'free' | 'light' | 'business' | 'business-pro';
-
-interface WidgetConfig {
-  defaultView: 'map' | 'list';
-  showHeader: boolean;
-  headerTitle?: string;
-  mapZoomLevel?: number;
-  primaryColor?: string;
-  showWidgetName?: boolean;
-  widgetName?: string;
-  premiumPlanName?: PremiumPlanName;
-}
+import type { WidgetStore } from './MapsyWidgetElement';
 
 interface AppProps {
-  config?: Partial<WidgetConfig>;
+  store: WidgetStore;
 }
 
-function App({ config: externalConfig }: AppProps = {}) {
-  const [locations, setLocations] = useState<Location[]>([]);
+function App({ store }: AppProps) {
+  // Subscribe to store changes
+  const [state, setState] = useState(store.getState());
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
-  const [initializing, setInitializing] = useState(true); // Renamed from 'loading' for clarity
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
-  const [currentView, setCurrentView] = useState<'map' | 'list'>('map');
-  const [shouldHideWidget, setShouldHideWidget] = useState(false);
-  const [showFreePlanNotice, setShowFreePlanNotice] = useState(false);
-  const [config, setConfig] = useState<WidgetConfig>({
-    defaultView: 'map',
-    showHeader: false, // Hide header by default
-    headerTitle: 'Our Locations',
-    mapZoomLevel: 12,
-    primaryColor: '#3B82F6',
-    showWidgetName: false,
-    widgetName: '',
-    ...externalConfig,
-  });
+  const [currentView, setCurrentView] = useState<'map' | 'list'>(state.config.defaultView || 'map');
+  const [initializing, setInitializing] = useState(true);
 
+  // Initialize API on mount
   useEffect(() => {
-    const initializeWidget = async () => {
-      console.log('[Widget] Initializing...');
-
+    const init = async () => {
       try {
         await initializeApi();
-        await fetchWidgetData();
-        console.log('[Widget] ✅ Ready');
+        setInitializing(false);
       } catch (error) {
-        console.error('[Widget] ❌ Error:', (error as Error)?.message);
+        console.error('[App] ❌ API init failed:', error);
+        setInitializing(false);
       }
     };
-
-    initializeWidget();
+    init();
   }, []);
 
-  // Apply external config changes without re-fetching from API
-  // Only update when actual config values change, not on every render
+  // Subscribe to store updates
   useEffect(() => {
-    if (externalConfig && Object.keys(externalConfig).length > 0) {
-      console.log('[Widget] 🔄 External config changed, updating preview...', externalConfig);
-      setConfig(prev => ({ ...prev, ...externalConfig }));
-      if (externalConfig.defaultView && externalConfig.defaultView !== currentView) {
-        setCurrentView(externalConfig.defaultView);
+    const unsubscribe = store.subscribe(() => {
+      const newState = store.getState();
+      setState(newState);
+
+      // Update current view if defaultView changed
+      if (newState.config.defaultView && newState.config.defaultView !== currentView) {
+        setCurrentView(newState.config.defaultView);
       }
-    }
-  }, [
-    externalConfig?.defaultView,
-    externalConfig?.showHeader,
-    externalConfig?.headerTitle,
-    externalConfig?.mapZoomLevel,
-    externalConfig?.primaryColor,
-    externalConfig?.showWidgetName,
-    externalConfig?.widgetName,
-    currentView,
-  ]);
+    });
 
-  // Fetch both config and locations in a single request
-  const fetchWidgetData = async () => {
-    try {
-      setInitializing(true);
-      const { config: configData, locations: locationsData } = await widgetDataService.getData();
+    return unsubscribe;
+  }, [store, currentView]);
 
-      // Set locations
-      setLocations(locationsData);
-
-      // Set config - API config takes priority, external config only applies for live editing
-      setConfig(configData);
-      setCurrentView(configData.defaultView || 'map');
-
-      // Check premium status - hide widget only if premiumPlanName is 'free'
-      const viewMode = getViewMode();
-      const inEditor = viewMode === 'Editor' || viewMode === 'Preview';
-      const premiumPlan = configData.premiumPlanName || 'free';
-      const isFreePlan = premiumPlan === 'free';
-
-      if (isFreePlan) {
-        if (inEditor) {
-          setShowFreePlanNotice(true);
-          setTimeout(() => setShowFreePlanNotice(false), 5000);
-        } else {
-          console.log('[Widget] Free plan on published site - hiding widget');
-          setShouldHideWidget(true);
-        }
-      }
-    } catch (error) {
-      console.error('[Widget Data] ❌', (error as Error)?.message);
-      setCurrentView(config.defaultView || 'map');
-    } finally {
-      setInitializing(false);
-    }
-  };
+  // Extract values from state
+  const { config, locations, shouldHideWidget, showFreePlanNotice } = state;
 
   const handleLocationSelect = useCallback((location: Location) => {
     setSelectedLocation(location);
@@ -139,7 +75,13 @@ function App({ config: externalConfig }: AppProps = {}) {
 
   // Memoize config values to prevent unnecessary re-renders
   const memoizedConfig = useMemo(() => ({
-    ...config,
+    defaultView: config.defaultView || 'map',
+    showHeader: config.showHeader || false,
+    headerTitle: config.headerTitle || 'Our Locations',
+    mapZoomLevel: config.mapZoomLevel || 12,
+    primaryColor: config.primaryColor || '#3B82F6',
+    showWidgetName: config.showWidgetName || false,
+    widgetName: config.widgetName || '',
   }), [
     config.defaultView,
     config.showHeader,
@@ -168,7 +110,10 @@ function App({ config: externalConfig }: AppProps = {}) {
       {/* Free Plan Notice - shown in editor for users without premium */}
       {showFreePlanNotice && (
         <div
-          onClick={() => setShowFreePlanNotice(false)}
+          onClick={() => {
+            // Dismiss by updating store
+            store.setPremiumStatus(state.premiumPlanName, false, false);
+          }}
           className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 cursor-pointer"
         >
           <div className="bg-white rounded-xl shadow-2xl p-8 mx-4 max-w-md text-center">

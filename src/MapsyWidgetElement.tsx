@@ -4,129 +4,113 @@ import App from './App';
 import {
   setCompId,
   setInstanceToken,
-  getWixClient,
   getAccessTokenListener,
   setViewModeFromWixConfig,
   widgetDataService
 } from './services/api';
 
-/**
- * Custom Element for Wix integration
- * Per Wix docs for self-hosted Site Widget:
- * - Store accessTokenListener in constructor (required for fetchWithAuth to work)
- * - Use wixClient.fetchWithAuth() to send requests - it automatically adds the access token
- * - Backend extracts instanceId from the access token via Wix API
- */
+/* =========================
+   TYPES
+========================= */
+
+type Listener = () => void;
+
+type WidgetState = {
+  config: any;
+  locations: any[];
+  premiumPlanName?: string;
+  shouldHideWidget?: boolean;
+  showFreePlanNotice?: boolean;
+};
+
+/* =========================
+   PER-INSTANCE STORE
+========================= */
+
+export class WidgetStore {
+  private state: WidgetState;
+  private listeners = new Set<Listener>();
+
+  constructor(initialConfig: any) {
+    this.state = {
+      config: initialConfig,
+      locations: [],
+      shouldHideWidget: false,
+      showFreePlanNotice: false
+    };
+  }
+
+  getState() {
+    return this.state;
+  }
+
+  setConfigPartial(update: Partial<any>) {
+    this.state = {
+      ...this.state,
+      config: { ...this.state.config, ...update }
+    };
+    this.emit();
+  }
+
+  setLocations(locations: any[]) {
+    this.state = { ...this.state, locations };
+    this.emit();
+  }
+
+  setPremiumStatus(premiumPlanName?: string, shouldHideWidget?: boolean, showFreePlanNotice?: boolean) {
+    this.state = {
+      ...this.state,
+      premiumPlanName,
+      shouldHideWidget,
+      showFreePlanNotice
+    };
+    this.emit();
+  }
+
+  subscribe(listener: Listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit() {
+    this.listeners.forEach(l => l());
+  }
+}
+
+/* =========================
+   CUSTOM ELEMENT
+========================= */
+
 class MapsyWidgetElement extends HTMLElement {
   private root: ReactDOM.Root | null = null;
   private container: HTMLDivElement | null = null;
-  public _initialized: boolean = false;
-  private _configFetched: boolean = false; // Track if we've fetched config from backend
-  // Store access token listener as per Wix example
-  private accessTokenListener: any = null;
-  private config = {
-    defaultView: 'map' as 'map' | 'list',
-    showHeader: false,
-    headerTitle: 'Our Locations',
-    mapZoomLevel: 12,
-    primaryColor: '#3B82F6',
-    showWidgetName: false,
-    widgetName: '',
-    apiUrl: 'https://mapsy-api.nextechspires.com/api'
-  };
+  private store: WidgetStore;
+  public _initialized = false;
+  private _backendFetched = false;
+  private accessTokenListener: any;
 
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
 
-    // Store access token listener (as per Wix docs example)
-    // This is required for wixClient.fetchWithAuth to work
     this.accessTokenListener = getAccessTokenListener();
 
-    console.log('[MapsyWidget] Constructor - Wix client:', !!getWixClient());
-    console.log('[MapsyWidget] Constructor - accessTokenListener stored:', !!this.accessTokenListener);
-
-    // Listen for config updates from settings panel via postMessage
-    this.setupPostMessageListener();
-  }
-
-  private setupPostMessageListener() {
-    // ✅ WIX OFFICIAL: Listen for property changes via postMessage from Wix
-    // Wix sends property updates to custom elements via postMessage
-    window.addEventListener('message', (event) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-
-        // Wix sends property updates with type 'props' or 'propsChanged'
-        if (data?.type === 'props' || data?.type === 'propsChanged') {
-          console.log('[Widget] 📨 Received props update from Wix:', data);
-
-          // Extract config properties from Wix props
-          const props = data.props || data;
-          const configUpdate: any = {};
-
-          if (props['default-view']) configUpdate.defaultView = props['default-view'];
-          if (props['show-header']) configUpdate.showHeader = props['show-header'] === 'true';
-          if (props['header-title']) configUpdate.headerTitle = props['header-title'];
-          if (props['map-zoom-level']) configUpdate.mapZoomLevel = parseInt(props['map-zoom-level'], 10);
-          if (props['primary-color']) configUpdate.primaryColor = props['primary-color'];
-          if (props['show-widget-name']) configUpdate.showWidgetName = props['show-widget-name'] === 'true';
-          if (props['widget-name']) configUpdate.widgetName = props['widget-name'];
-
-          if (Object.keys(configUpdate).length > 0) {
-            console.log('[Widget] 🔄 Updating config from Wix props:', configUpdate);
-            this.config = { ...this.config, ...configUpdate };
-
-            // Re-render if initialized
-            if (this.root && this.isConnected && this._initialized) {
-              console.log('[Widget] 🔄 Re-rendering with Wix props');
-              this.mountReactApp();
-            }
-          }
-        }
-
-        // Legacy: Keep support for custom postMessage format
-        if (event.data?.type === 'MAPSY_CONFIG_UPDATE' && event.data?.source === 'settings-panel') {
-          console.log('[Widget] 📨 Received config update via postMessage:', event.data.config);
-
-          // Update internal config
-          const { auth, ...configWithoutAuth } = event.data.config;
-          this.config = { ...this.config, ...configWithoutAuth };
-
-          // Re-render if initialized
-          if (this.root && this.isConnected && this._initialized) {
-            console.log('[Widget] 🔄 Applying config from postMessage:', this.config);
-            this.mountReactApp();
-          }
-        }
-      } catch (e) {
-        // Ignore parsing errors
-      }
+    // Create per-instance store with default config
+    this.store = new WidgetStore({
+      defaultView: 'map',
+      showHeader: false,
+      headerTitle: 'Our Locations',
+      mapZoomLevel: 12,
+      primaryColor: '#3B82F6',
+      showWidgetName: false,
+      widgetName: '',
+      apiUrl: 'https://mapsy-api.nextechspires.com/api'
     });
-
-    console.log('[Widget] ✅ Wix property listeners set up');
   }
 
-  // ✅ OVERRIDE: Add defensive wrapper around setAttribute
-  // This prevents Wix editor from crashing when trying to set attributes on a detached element
-  setAttribute(name: string, value: string): void {
-    try {
-      // Check if we're still connected to the DOM before setting attributes
-      if (!this.isConnected && !this.shadowRoot) {
-        console.warn(`[Widget] setAttribute('${name}') called on detached element, deferring...`);
-        // Defer the setAttribute until the element is connected
-        requestAnimationFrame(() => {
-          if (this.isConnected) {
-            super.setAttribute(name, value);
-          }
-        });
-        return;
-      }
-      super.setAttribute(name, value);
-    } catch (error) {
-      console.error(`[Widget] setAttribute('${name}') error:`, error);
-    }
-  }
+  /* =========================
+     ATTRIBUTES
+  ========================= */
 
   static get observedAttributes() {
     return [
@@ -137,360 +121,313 @@ class MapsyWidgetElement extends HTMLElement {
       'primary-color', 'primarycolor',
       'show-widget-name', 'showwidgetname',
       'widget-name', 'widgetname',
-      'api-url', 'compid', 'comp-id', 'instance', 'config', 'auth',
-      'wixconfig' // ✅ Wix official: ViewMode is here
+      'api-url', 'apiurl',
+      'compid', 'comp-id',
+      'instance',
+      'auth',
+      'config',
+      'wixconfig'
     ];
   }
 
+  /* =========================
+     LIFECYCLE
+  ========================= */
+
   connectedCallback() {
-    // Handle reconnection after disconnect (e.g., moved in DOM by Wix editor)
-    if (this._initialized && !this.root) {
-      console.log('[Widget] 🔄 Element reconnected - remounting React app only');
-      requestAnimationFrame(() => {
-        if (this.isConnected) {
-          this.mountReactApp();
-        }
-      });
-      return;
-    }
-
     if (this._initialized) {
-      console.log('[Widget] Already initialized, skipping connectedCallback');
+      // Handle reconnection - just remount if needed
+      if (!this.root) {
+        console.log('[Widget] 🔄 Element reconnected - remounting React');
+        requestAnimationFrame(() => {
+          if (this.isConnected) {
+            this.mountReactOnce();
+          }
+        });
+      }
       return;
     }
 
-    // Add a small delay to ensure we're in a stable DOM state
-    // This helps prevent race conditions with Wix editor's preview system
-    requestAnimationFrame(async () => {
-      if (this._initialized) return;
+    this._initialized = true;
+    console.log('[Widget] 🎬 Initializing...');
 
-      // Double-check we're still connected after the delay
+    requestAnimationFrame(() => {
       if (!this.isConnected) {
-        console.warn('[Widget] Element disconnected before initialization completed');
+        console.warn('[Widget] Disconnected before init completed');
         return;
       }
 
-      this._initialized = true;
-
-      // Debug: Log all attributes on the element
-      const attrs: string[] = [];
-      for (let i = 0; i < this.attributes.length; i++) {
-        const attr = this.attributes[i];
-        attrs.push(`${attr.name}="${attr.value.substring(0, 50)}"`);
-      }
-      console.log('[Widget] Element attributes:', attrs.join(', ') || 'none');
-
-      // ✅ WIX OFFICIAL: Read ViewMode from wixconfig attribute
       this.readWixConfig();
-
-      try {
-        // First, read compId and instance from attributes (needed for API calls)
-        this.updateConfigFromAttributes();
-
-        // Fetch configuration from backend ONLY on first load
-        if (!this._configFetched) {
-          console.log('[Widget] 🔄 Fetching config from backend (first load)...');
-          try {
-            const data = await widgetDataService.getData();
-            if (data.config) {
-              // Merge backend config with current config
-              this.config = {
-                ...this.config,
-                defaultView: data.config.defaultView ?? this.config.defaultView,
-                showHeader: data.config.showHeader ?? this.config.showHeader,
-                headerTitle: data.config.headerTitle ?? this.config.headerTitle,
-                mapZoomLevel: data.config.mapZoomLevel ?? this.config.mapZoomLevel,
-                primaryColor: data.config.primaryColor ?? this.config.primaryColor,
-                showWidgetName: data.config.showWidgetName ?? this.config.showWidgetName,
-                widgetName: data.config.widgetName ?? this.config.widgetName,
-              };
-              console.log('[Widget] ✅ Loaded config from backend:', this.config);
-            }
-            this._configFetched = true; // Mark as fetched
-          } catch (error) {
-            console.warn('[Widget] ⚠️ Could not fetch config from backend, using defaults:', error);
-            this._configFetched = true; // Mark as attempted even if failed
-          }
-        } else {
-          console.log('[Widget] ℹ️ Config already fetched, skipping backend call');
-        }
-
-        // Mount React app with loaded config
-        this.mountReactApp();
-      } catch (error) {
-        console.error('[Widget] Mount error:', error);
-      }
+      this.readInitialAttributes();
+      this.mountReactOnce();
+      this.fetchBackendOnce();
     });
   }
 
   disconnectedCallback() {
     console.warn('[Widget] ⚠️ Element disconnected');
-    try {
-      if (this.root) {
-        this.root.unmount();
-        this.root = null;
-      }
-      // Don't reset _initialized or _configFetched to preserve state
-      // This allows quick reconnection without re-fetching from backend
-    } catch (error) {
-      console.error('[Widget] Disconnect error:', error);
-    }
+    // Don't unmount - Wix reconnects frequently
+    // Keep store and state intact
   }
 
-  attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    // Defensive check: ensure we're still in a valid state
-    if (!this.shadowRoot) {
-      console.warn('[Widget] attributeChangedCallback called before shadowRoot initialized');
-      return;
-    }
+  /* =========================
+     ATTRIBUTE CHANGES
+  ========================= */
 
-    if (oldValue === newValue || newValue === null) {
+  attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
+    if (!this._initialized || oldValue === newValue || newValue === null) {
       return;
     }
 
     console.log(`[Widget] 🔔 Attribute changed: ${name} = ${newValue}`);
 
-    // ✅ WIX OFFICIAL: Handle wixconfig attribute for ViewMode detection
-    if (name === 'wixconfig') {
-      // this.readWixConfig();
-      // return;
-    }
-
-    // Track which config property was updated
-    let configPropertyUpdated: string | null = null;
+    const update = (obj: any) => this.store.setConfigPartial(obj);
 
     switch (name) {
       case 'default-view':
       case 'defaultview':
-        this.config.defaultView = (newValue === 'list' ? 'list' : 'map');
-        configPropertyUpdated = 'defaultView';
+        update({ defaultView: newValue === 'list' ? 'list' : 'map' });
         break;
+
       case 'show-header':
       case 'showheader':
-        this.config.showHeader = newValue === 'true';
-        configPropertyUpdated = 'showHeader';
+        update({ showHeader: newValue === 'true' });
         break;
+
       case 'header-title':
       case 'headertitle':
-        this.config.headerTitle = newValue || 'Our Locations';
-        configPropertyUpdated = 'headerTitle';
+        update({ headerTitle: newValue });
         break;
+
       case 'map-zoom-level':
       case 'mapzoomlevel':
-        this.config.mapZoomLevel = parseInt(newValue || '12', 10);
-        configPropertyUpdated = 'mapZoomLevel';
+        update({ mapZoomLevel: parseInt(newValue, 10) });
         break;
+
       case 'primary-color':
       case 'primarycolor':
-        this.config.primaryColor = newValue || '#3B82F6';
-        configPropertyUpdated = 'primaryColor';
+        update({ primaryColor: newValue });
         break;
+
       case 'show-widget-name':
       case 'showwidgetname':
-        this.config.showWidgetName = newValue === 'true';
-        configPropertyUpdated = 'showWidgetName';
+        update({ showWidgetName: newValue === 'true' });
         break;
+
       case 'widget-name':
       case 'widgetname':
-        this.config.widgetName = newValue || '';
-        configPropertyUpdated = 'widgetName';
+        update({ widgetName: newValue });
         break;
+
       case 'api-url':
-        this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
-        configPropertyUpdated = 'apiUrl';
+      case 'apiurl':
+        update({ apiUrl: newValue });
         break;
-      case 'compid':
-      case 'comp-id':
-        // Set compId in the wixService for API requests
-        setCompId(newValue);
-        return;
-      case 'instance':
-        // Set instance token in the wixService for API requests
-        setInstanceToken(newValue);
-        return;
+
+      case 'config':
+        try {
+          const parsedConfig = JSON.parse(newValue);
+          // Extract auth if present
+          if (parsedConfig.auth?.instanceToken) {
+            setInstanceToken(parsedConfig.auth.instanceToken);
+          }
+          // Remove auth from config before storing
+          const { auth, ...configWithoutAuth } = parsedConfig;
+          update(configWithoutAuth);
+        } catch (e) {
+          console.warn('[Widget] Failed to parse config attribute');
+        }
+        break;
+
       case 'auth':
-        // Wix might pass auth data as an attribute
         try {
           const authData = JSON.parse(newValue);
           if (authData.instance) {
             setInstanceToken(authData.instance);
           }
-        } catch (error) {
-          console.log('[Widget] ⚠️ Could not parse auth attribute');
-        }
-        return;
-      case 'config':
-        try {
-          const parsedConfig = JSON.parse(newValue);
-
-          // Extract auth data if present
-          if (parsedConfig.auth?.instanceToken) {
-            setInstanceToken(parsedConfig.auth.instanceToken);
-          }
-
-          // Remove auth from config before storing (it's not a display config)
-          const { auth, ...configWithoutAuth } = parsedConfig;
-          this.config = { ...this.config, ...configWithoutAuth };
-          configPropertyUpdated = 'config (multiple)';
-        } catch (error) {
-          console.error('[Widget] Config parse error:', error);
+        } catch (e) {
+          console.warn('[Widget] Failed to parse auth attribute');
         }
         break;
-    }
 
-    // Only re-render if we're initialized and a config property was updated
-    if (configPropertyUpdated && this.root && this.isConnected && this._initialized) {
-      console.log(`[Widget] ✅ Updated ${configPropertyUpdated} → re-rendering`);
-      this.mountReactApp();
+      case 'compid':
+      case 'comp-id':
+        setCompId(newValue);
+        break;
+
+      case 'instance':
+        setInstanceToken(newValue);
+        break;
+
+      case 'wixconfig':
+        this.readWixConfig();
+        break;
     }
   }
 
-  /**
-   * ✅ WIX OFFICIAL: Read ViewMode from wixconfig attribute with URL fallback
-   * Per Wix documentation: wixconfig is the official way to access ViewMode
-   */
+  /* =========================
+     WIX CONFIG
+  ========================= */
+
   private readWixConfig() {
-    // Wix official pattern for reading ViewMode
-    const wixconfig = JSON.parse((this as any)?.attributes?.wixconfig?.value ?? '{}');
-    const viewMode = wixconfig?.ViewMode as 'Editor' | 'Preview' | 'Site' | undefined;
-
-    if (viewMode) {
-      console.log('[Widget] 🔍 ViewMode from wixconfig:', viewMode);
-      setViewModeFromWixConfig(viewMode);
-    } else {
-      // Fallback: Detect editor mode from URL
-      console.log('[Widget] ⚠️ No ViewMode in wixconfig, checking URL...');
-      const url = window.location.href.toLowerCase();
-
-      if (url.includes('editor.wix.com') ||
-          url.includes('editor-x.wix.com') ||
-          url.includes('static.parastorage.com')) {
-        console.log('[Widget] 🔍 Editor mode detected from URL:', url);
-        setViewModeFromWixConfig('Editor');
-      } else if (url.includes('preview.wix.com')) {
-        console.log('[Widget] 🔍 Preview mode detected from URL:', url);
-        setViewModeFromWixConfig('Preview');
-      } else {
-        console.log('[Widget] 🔍 Site mode (default)');
-        setViewModeFromWixConfig('Site');
-      }
-    }
-  }
-
-  private updateConfigFromAttributes() {
-    // Read all attributes and update config
-    const defaultView = this.getAttribute('default-view');
-    const showHeader = this.getAttribute('show-header');
-    const headerTitle = this.getAttribute('header-title');
-    const mapZoomLevel = this.getAttribute('map-zoom-level');
-    const primaryColor = this.getAttribute('primary-color');
-    const showWidgetName = this.getAttribute('show-widget-name');
-    const widgetName = this.getAttribute('widget-name');
-    const apiUrl = this.getAttribute('api-url');
-    const compIdAttr = this.getAttribute('compid') || this.getAttribute('comp-id');
-    const instanceAttr = this.getAttribute('instance');
-
-    if (defaultView) this.config.defaultView = defaultView as 'map' | 'list';
-    if (showHeader !== null) this.config.showHeader = showHeader === 'true';
-    if (headerTitle) this.config.headerTitle = headerTitle;
-    if (mapZoomLevel) this.config.mapZoomLevel = parseInt(mapZoomLevel, 10);
-    if (primaryColor) this.config.primaryColor = primaryColor;
-    if (showWidgetName !== null) this.config.showWidgetName = showWidgetName === 'true';
-    if (widgetName) this.config.widgetName = widgetName;
-    if (apiUrl) this.config.apiUrl = apiUrl;
-
-    // Set Wix-specific attributes in the service
-    if (compIdAttr) {
-      setCompId(compIdAttr);
-    }
-    if (instanceAttr) {
-      setInstanceToken(instanceAttr);
-    }
-  }
-
-  private mountReactApp() {
-    // Safety check: ensure we're in a valid state
-    if (!this.shadowRoot || !this.isConnected) {
-      console.warn('[Widget] mountReactApp called in invalid state');
-      return;
-    }
-
-    // Only set up shadow DOM once
-    if (!this.container && this.shadowRoot) {
-      // Create container for React app
-      this.container = document.createElement('div');
-      this.container.style.width = '100%';
-      this.container.style.height = '100%';
-
-      // Add styles to shadow DOM
-      const style = document.createElement('style');
-      style.textContent = `
-        :host {
-          display: block;
-          width: 100%;
-          height: 100%;
-        }
-        * {
-          box-sizing: border-box;
-        }
-      `;
-      this.shadowRoot.appendChild(style);
-
-      // Add link to widget's compiled CSS from the CDN
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://mapsy-widget.nextechspires.com/style.css';
-      this.shadowRoot.appendChild(link);
-
-      this.shadowRoot.appendChild(this.container);
-
-      // Create React root once
-      this.root = ReactDOM.createRoot(this.container);
-    }
-
-    // Render/update React app
-    if (this.root) {
-      this.root.render(
-        <React.StrictMode>
-          <App config={this.config} />
-        </React.StrictMode>
+    try {
+      const wixconfig = JSON.parse(
+        this.getAttribute('wixconfig') || '{}'
       );
+      if (wixconfig?.ViewMode) {
+        setViewModeFromWixConfig(wixconfig.ViewMode);
+      }
+    } catch (e) {
+      console.warn('[Widget] Failed to parse wixconfig');
     }
   }
 
-  // DEPRECATED: Old method that uses setAttribute (inefficient)
-  public setProp(property: string, value: any) {
-    const attrName = property.replace(/([A-Z])/g, '-$1').toLowerCase();
-    this.setAttribute(attrName, String(value));
+  /* =========================
+     INITIAL ATTRIBUTES
+  ========================= */
+
+  private readInitialAttributes() {
+    const read = (kebab: string, camel: string) =>
+      this.getAttribute(kebab) ?? this.getAttribute(camel);
+
+    const partial: any = {};
+
+    const defaultView = read('default-view', 'defaultview');
+    if (defaultView) partial.defaultView = defaultView === 'list' ? 'list' : 'map';
+
+    const showHeader = read('show-header', 'showheader');
+    if (showHeader !== null) partial.showHeader = showHeader === 'true';
+
+    const headerTitle = read('header-title', 'headertitle');
+    if (headerTitle) partial.headerTitle = headerTitle;
+
+    const zoom = read('map-zoom-level', 'mapzoomlevel');
+    if (zoom) partial.mapZoomLevel = parseInt(zoom, 10);
+
+    const color = read('primary-color', 'primarycolor');
+    if (color) partial.primaryColor = color;
+
+    const showName = read('show-widget-name', 'showwidgetname');
+    if (showName !== null) partial.showWidgetName = showName === 'true';
+
+    const widgetName = read('widget-name', 'widgetname');
+    if (widgetName) partial.widgetName = widgetName;
+
+    const apiUrl = read('api-url', 'apiurl');
+    if (apiUrl) partial.apiUrl = apiUrl;
+
+    if (Object.keys(partial).length > 0) {
+      this.store.setConfigPartial(partial);
+    }
+
+    // Handle auth credentials
+    const compId = read('compid', 'comp-id');
+    if (compId) setCompId(compId);
+
+    const instance = this.getAttribute('instance');
+    if (instance) setInstanceToken(instance);
   }
 
-  // ✅ NEW: Direct config update without setAttribute
-  public updateConfig(newConfig: Partial<typeof this.config>) {
-    // Directly update internal config state
-    this.config = { ...this.config, ...newConfig };
+  /* =========================
+     BACKEND (ONCE)
+  ========================= */
 
-    // Re-render if already initialized
-    if (this.root && this.isConnected && this._initialized) {
-      console.log('[Widget] 🔄 Config updated directly:', this.config);
-      this.mountReactApp();
+  private async fetchBackendOnce() {
+    if (this._backendFetched) return;
+    this._backendFetched = true;
+
+    console.log('[Widget] 🔄 Fetching from backend...');
+
+    try {
+      const { config, locations } = await widgetDataService.getData();
+
+      if (config) {
+        this.store.setConfigPartial(config);
+
+        // Handle premium plan logic
+        if ('premiumPlanName' in config) {
+          const viewMode = this.getViewMode();
+          const inEditor = viewMode === 'Editor' || viewMode === 'Preview';
+          const isFreePlan = config.premiumPlanName === 'free';
+
+          if (isFreePlan) {
+            if (inEditor) {
+              this.store.setPremiumStatus(config.premiumPlanName, false, true);
+              // Auto-dismiss free plan notice after 5 seconds
+              setTimeout(() => {
+                this.store.setPremiumStatus(config.premiumPlanName, false, false);
+              }, 5000);
+            } else {
+              console.log('[Widget] Free plan on published site - hiding widget');
+              this.store.setPremiumStatus(config.premiumPlanName, true, false);
+            }
+          }
+        }
+      }
+
+      if (locations) {
+        this.store.setLocations(locations);
+      }
+
+      console.log('[Widget] ✅ Backend data loaded');
+    } catch (e) {
+      console.error('[Widget] ❌ Backend fetch failed:', e);
     }
   }
 
-  // ✅ NEW: Set entire config object at once
-  public setConfig(config: Partial<typeof this.config>) {
-    this.updateConfig(config);
+  /* =========================
+     VIEW MODE HELPER
+  ========================= */
+
+  private getViewMode(): string {
+    try {
+      const wixconfig = JSON.parse(this.getAttribute('wixconfig') || '{}');
+      return wixconfig?.ViewMode || 'Site';
+    } catch {
+      return 'Site';
+    }
   }
 
-  public getConfig() {
-    return { ...this.config };
+  /* =========================
+     REACT (ONCE)
+  ========================= */
+
+  private mountReactOnce() {
+    if (this.root || !this.shadowRoot) return;
+
+    console.log('[Widget] 🎨 Mounting React...');
+
+    this.container = document.createElement('div');
+    this.container.style.width = '100%';
+    this.container.style.height = '100%';
+
+    const style = document.createElement('style');
+    style.textContent = `
+      :host { display:block;width:100%;height:100%; }
+      * { box-sizing:border-box; }
+    `;
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://mapsy-widget.nextechspires.com/style.css';
+
+    this.shadowRoot.append(style, link, this.container);
+
+    this.root = ReactDOM.createRoot(this.container);
+    this.root.render(<App store={this.store} />);
+
+    console.log('[Widget] ✅ React mounted');
   }
 }
 
-// Register the custom element
+/* =========================
+   REGISTER
+========================= */
+
 if (!customElements.get('mapsy-widget')) {
   customElements.define('mapsy-widget', MapsyWidgetElement);
 
-  // Manually upgrade any existing elements that were in DOM before registration
+  // Manually upgrade any existing elements
   document.querySelectorAll('mapsy-widget').forEach((widget) => {
     if (widget instanceof MapsyWidgetElement && !widget._initialized) {
       widget.connectedCallback();
