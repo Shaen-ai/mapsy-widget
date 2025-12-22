@@ -199,10 +199,6 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    console.log(`[Widget] 🔔 attributeChangedCallback called: ${name}`);
-    console.log('[Widget] Old value:', oldValue);
-    console.log('[Widget] New value:', newValue);
-
     // Defensive check: ensure we're still in a valid state
     if (!this.shadowRoot) {
       console.warn('[Widget] attributeChangedCallback called before shadowRoot initialized');
@@ -210,11 +206,10 @@ class MapsyWidgetElement extends HTMLElement {
     }
 
     if (oldValue === newValue || newValue === null) {
-      console.log('[Widget] ⏭️  Skipping - old === new or new is null');
       return;
     }
 
-    console.log(`[Widget] ✅ Processing attribute change: ${name}`);
+    console.log(`[Widget] 🔔 Attribute changed: ${name} = ${newValue}`);
 
     // ✅ WIX OFFICIAL: Handle wixconfig attribute for ViewMode detection
     if (name === 'wixconfig') {
@@ -222,38 +217,48 @@ class MapsyWidgetElement extends HTMLElement {
       return;
     }
 
+    // Track which config property was updated
+    let configPropertyUpdated: string | null = null;
+
     switch (name) {
       case 'default-view':
       case 'defaultview':
         this.config.defaultView = (newValue === 'list' ? 'list' : 'map');
+        configPropertyUpdated = 'defaultView';
         break;
       case 'show-header':
       case 'showheader':
         this.config.showHeader = newValue === 'true';
+        configPropertyUpdated = 'showHeader';
         break;
       case 'header-title':
       case 'headertitle':
         this.config.headerTitle = newValue || 'Our Locations';
+        configPropertyUpdated = 'headerTitle';
         break;
       case 'map-zoom-level':
       case 'mapzoomlevel':
         this.config.mapZoomLevel = parseInt(newValue || '12', 10);
-        console.log(`[Widget] 🔍 Zoom level updated: ${oldValue} → ${this.config.mapZoomLevel}`);
+        configPropertyUpdated = 'mapZoomLevel';
         break;
       case 'primary-color':
       case 'primarycolor':
         this.config.primaryColor = newValue || '#3B82F6';
+        configPropertyUpdated = 'primaryColor';
         break;
       case 'show-widget-name':
       case 'showwidgetname':
         this.config.showWidgetName = newValue === 'true';
+        configPropertyUpdated = 'showWidgetName';
         break;
       case 'widget-name':
       case 'widgetname':
         this.config.widgetName = newValue || '';
+        configPropertyUpdated = 'widgetName';
         break;
       case 'api-url':
         this.config.apiUrl = newValue || 'https://mapsy-api.nextechspires.com/api';
+        configPropertyUpdated = 'apiUrl';
         break;
       case 'compid':
       case 'comp-id':
@@ -268,10 +273,8 @@ class MapsyWidgetElement extends HTMLElement {
         // Wix might pass auth data as an attribute
         try {
           const authData = JSON.parse(newValue);
-          console.log('[Widget] 🔐 Auth attribute received:', authData);
           if (authData.instance) {
             setInstanceToken(authData.instance);
-            console.log('[Widget] ✅ Instance token extracted from auth attribute');
           }
         } catch (error) {
           console.log('[Widget] ⚠️ Could not parse auth attribute');
@@ -284,21 +287,21 @@ class MapsyWidgetElement extends HTMLElement {
           // Extract auth data if present
           if (parsedConfig.auth?.instanceToken) {
             setInstanceToken(parsedConfig.auth.instanceToken);
-            console.log('[Widget] ✅ Instance token extracted from config.auth');
           }
 
           // Remove auth from config before storing (it's not a display config)
           const { auth, ...configWithoutAuth } = parsedConfig;
           this.config = { ...this.config, ...configWithoutAuth };
+          configPropertyUpdated = 'config (multiple)';
         } catch (error) {
           console.error('[Widget] Config parse error:', error);
         }
         break;
     }
 
-    // Only re-render if we're initialized and still connected to the DOM
-    if (this.root && this.isConnected && this._initialized) {
-      console.log(`[Widget] 🔄 Re-rendering with config:`, this.config);
+    // Only re-render if we're initialized and a config property was updated
+    if (configPropertyUpdated && this.root && this.isConnected && this._initialized) {
+      console.log(`[Widget] ✅ Updated ${configPropertyUpdated} → re-rendering`);
       this.mountReactApp();
     }
   }
