@@ -141,7 +141,10 @@ class MapsyWidgetElement extends HTMLElement {
   ========================== */
 
   connectedCallback() {
+    console.log('[Widget] 🔌 connectedCallback called', { initialized: this._initialized, hasRoot: !!this.root });
+
     if (this._initialized) {
+      console.log('[Widget] ⚠️ Widget already initialized, skipping re-initialization');
       if (!this.root) {
         requestAnimationFrame(() => {
           if (this.isConnected) this.mountReactOnce();
@@ -151,6 +154,7 @@ class MapsyWidgetElement extends HTMLElement {
     }
 
     this._initialized = true;
+    console.log('[Widget] 🆕 First time initialization');
 
     requestAnimationFrame(() => {
       if (!this.isConnected) return;
@@ -169,8 +173,11 @@ class MapsyWidgetElement extends HTMLElement {
   ========================== */
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
+    console.log('[Widget] 🔔 attributeChangedCallback:', { name, oldValue, newValue, initialized: this._initialized });
+
     if (!this._initialized || oldValue === newValue || newValue === null) return;
 
+    console.log('[Widget] ✅ Attribute change accepted, updating store');
     const update = (obj: any) => this.store.setConfigPartial(obj);
 
     switch (name) {
@@ -269,11 +276,18 @@ class MapsyWidgetElement extends HTMLElement {
   ========================== */
 
   private async fetchBackendOnce() {
-    if (this._backendFetched) return;
+    console.log('[Widget] 📡 fetchBackendOnce called', { alreadyFetched: this._backendFetched });
+
+    if (this._backendFetched) {
+      console.log('[Widget] ✋ Backend already fetched, skipping');
+      return;
+    }
     this._backendFetched = true;
 
+    console.log('[Widget] 🌐 Fetching data from backend...');
     try {
       const { config, locations } = await widgetDataService.getData();
+      console.log('[Widget] ✅ Backend data received:', { hasConfig: !!config, locationsCount: locations?.length });
       if (config) this.store.setConfigPartial(config);
       if (locations) this.store.setLocations(locations);
 
@@ -308,8 +322,14 @@ class MapsyWidgetElement extends HTMLElement {
   ========================== */
 
   private mountReactOnce() {
-    if (this.root || !this.shadowRoot) return;
+    console.log('[Widget] ⚛️ mountReactOnce called', { hasRoot: !!this.root, hasShadowRoot: !!this.shadowRoot });
 
+    if (this.root || !this.shadowRoot) {
+      console.log('[Widget] ✋ React already mounted or no shadow root, skipping');
+      return;
+    }
+
+    console.log('[Widget] 🚀 Mounting React app...');
     this.container = document.createElement('div');
     this.container.style.width = '100%';
     this.container.style.height = '100%';
@@ -330,6 +350,7 @@ class MapsyWidgetElement extends HTMLElement {
 
     // Only dynamic config triggers React updates
     this.root.render(<App store={this.store} />);
+    console.log('[Widget] ✅ React app mounted');
   }
 }
 
