@@ -159,8 +159,6 @@ class MapsyWidgetElement extends HTMLElement {
         console.warn('[Widget] Disconnected before init completed');
         return;
       }
-
-      this.readWixConfig();
       this.readInitialAttributes();
       this.mountReactOnce();
       this.fetchBackendOnce();
