@@ -11,6 +11,8 @@ interface AppProps {
 }
 
 function App({ store }: AppProps) {
+  console.log('[App] 🎨 Rendering App component');
+
   // Subscribe to store changes
   const [state, setState] = useState(store.getState());
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
@@ -36,17 +38,19 @@ function App({ store }: AppProps) {
   // Subscribe to store updates
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
-      const newState = store.getState();
-      setState(newState);
-
-      // Update current view if defaultView changed
-      if (newState.config.defaultView && newState.config.defaultView !== currentView) {
-        setCurrentView(newState.config.defaultView);
-      }
+      console.log('[App] 📬 Store update received, setting new state');
+      setState(store.getState());
     });
 
     return unsubscribe;
-  }, [store, currentView]);
+  }, [store]);
+
+  // Separate effect to update current view when defaultView changes
+  useEffect(() => {
+    if (state.config.defaultView && state.config.defaultView !== currentView) {
+      setCurrentView(state.config.defaultView);
+    }
+  }, [state.config.defaultView, currentView]);
 
   // Extract values from state
   const { config, locations, shouldHideWidget, showFreePlanNotice } = state;

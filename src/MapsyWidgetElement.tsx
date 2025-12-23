@@ -5,7 +5,6 @@ import {
   setCompId,
   setInstanceToken,
   getAccessTokenListener,
-  setViewModeFromWixConfig,
   widgetDataService
 } from './services/api';
 
@@ -45,6 +44,7 @@ export class WidgetStore {
   }
 
   setConfigPartial(update: Partial<any>) {
+    console.log('[WidgetStore] 📝 Config update:', update);
     this.state = {
       ...this.state,
       config: { ...this.state.config, ...update }
@@ -53,11 +53,13 @@ export class WidgetStore {
   }
 
   setLocations(locations: any[]) {
+    console.log('[WidgetStore] 📍 Locations update:', locations.length, 'locations');
     this.state = { ...this.state, locations };
     this.emit();
   }
 
   setPremiumStatus(premiumPlanName?: string, shouldHideWidget?: boolean, showFreePlanNotice?: boolean) {
+    console.log('[WidgetStore] 💎 Premium status update:', { premiumPlanName, shouldHideWidget, showFreePlanNotice });
     this.state = {
       ...this.state,
       premiumPlanName,
@@ -73,6 +75,7 @@ export class WidgetStore {
   }
 
   private emit() {
+    console.log('[WidgetStore] 🔔 Emitting to', this.listeners.size, 'listeners');
     this.listeners.forEach(l => l());
   }
 }
@@ -179,7 +182,10 @@ class MapsyWidgetElement extends HTMLElement {
       return;
     }
 
-    console.log(`[Widget] 🔔 Attribute changed: ${name} = ${newValue}`);
+    console.log(`[Widget] 🔔 Attribute changed: ${name}`, {
+      oldValue: oldValue?.substring(0, 50),
+      newValue: newValue?.substring(0, 50)
+    });
 
     const update = (obj: any) => this.store.setConfigPartial(obj);
 
@@ -258,29 +264,10 @@ class MapsyWidgetElement extends HTMLElement {
       case 'instance':
         setInstanceToken(newValue);
         break;
-
-      case 'wixconfig':
-        this.readWixConfig();
-        break;
     }
   }
 
-  /* =========================
-     WIX CONFIG
-  ========================= */
-
-  private readWixConfig() {
-    try {
-      const wixconfig = JSON.parse(
-        this.getAttribute('wixconfig') || '{}'
-      );
-      if (wixconfig?.ViewMode) {
-        setViewModeFromWixConfig(wixconfig.ViewMode);
-      }
-    } catch (e) {
-      console.warn('[Widget] Failed to parse wixconfig');
-    }
-  }
+ 
 
   /* =========================
      INITIAL ATTRIBUTES
@@ -333,7 +320,11 @@ class MapsyWidgetElement extends HTMLElement {
   ========================= */
 
   private async fetchBackendOnce() {
-    if (this._backendFetched) return;
+    console.log('[Widget] 🔍 fetchBackendOnce called, already fetched:', this._backendFetched);
+    if (this._backendFetched) {
+      console.log('[Widget] ⏭️ Skipping backend fetch - already fetched');
+      return;
+    }
     this._backendFetched = true;
 
     console.log('[Widget] 🔄 Fetching from backend...');
@@ -380,12 +371,14 @@ class MapsyWidgetElement extends HTMLElement {
   ========================= */
 
   private getViewMode(): string {
-    try {
-      const wixconfig = JSON.parse(this.getAttribute('wixconfig') || '{}');
-      return wixconfig?.ViewMode || 'Site';
-    } catch {
+    const url = window.location.href.toLowerCase();
+    if (url.includes('editor.wix.com') ||
+          url.includes('editor-x.wix.com') ||
+          url.includes('static.parastorage.com')) {
+        console.log('[Widget] 🔍 Editor mode detected from URL:', url);
+        return 'Editor';
+      }
       return 'Site';
-    }
   }
 
   /* =========================

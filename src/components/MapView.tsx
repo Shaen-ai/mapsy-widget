@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import { Location } from '../types/location';
 
@@ -17,12 +17,28 @@ const MapView: React.FC<MapViewProps> = ({
   onMarkersLoad,
   onMarkerClick,
 }) => {
+  console.log('[MapView] 🗺️ Rendering MapView', { locationsCount: locations.length, mapZoomLevel });
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<any[]>([]); // Using any for now as AdvancedMarkerElement types might not be available
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
+  // Store callbacks in refs so they don't trigger effect re-runs
+  const onMapLoadRef = useRef(onMapLoad);
+  const onMarkersLoadRef = useRef(onMarkersLoad);
+  const onMarkerClickRef = useRef(onMarkerClick);
+
+  // Update callback refs when they change
   useEffect(() => {
+    onMapLoadRef.current = onMapLoad;
+    onMarkersLoadRef.current = onMarkersLoad;
+    onMarkerClickRef.current = onMarkerClick;
+  });
+
+  useEffect(() => {
+    console.log('[MapView] ⚙️ useEffect triggered - recreating map/markers', { locationsCount: locations.length, mapZoomLevel });
+
     // HARDCODED GOOGLE MAPS API KEY - DO NOT CHANGE
     const GOOGLE_MAPS_API_KEY = 'AIzaSyAU-ogdEZffsjmKb6PH8WjlSRr-Fuw9ti8';
 
@@ -47,8 +63,8 @@ const MapView: React.FC<MapViewProps> = ({
         // Initialize info window
         infoWindowRef.current = new google.maps.InfoWindow();
 
-        if (onMapLoad) {
-          onMapLoad(mapInstance.current);
+        if (onMapLoadRef.current) {
+          onMapLoadRef.current(mapInstance.current);
         }
       } else if (mapInstance.current) {
         // Map already exists, apply new zoom level directly
@@ -88,8 +104,8 @@ const MapView: React.FC<MapViewProps> = ({
                   infoWindowRef.current.setContent(content);
                   infoWindowRef.current.open(mapInstance.current, marker as any);
                 }
-                if (onMarkerClick) {
-                  onMarkerClick(location);
+                if (onMarkerClickRef.current) {
+                  onMarkerClickRef.current(location);
                 }
               });
 
@@ -110,8 +126,8 @@ const MapView: React.FC<MapViewProps> = ({
                   infoWindowRef.current.setContent(content);
                   infoWindowRef.current.open(mapInstance.current, marker);
                 }
-                if (onMarkerClick) {
-                  onMarkerClick(location);
+                if (onMarkerClickRef.current) {
+                  onMarkerClickRef.current(location);
                 }
               });
 
@@ -124,8 +140,8 @@ const MapView: React.FC<MapViewProps> = ({
 
         markersRef.current = newMarkers;
 
-        if (onMarkersLoad) {
-          onMarkersLoad(newMarkers);
+        if (onMarkersLoadRef.current) {
+          onMarkersLoadRef.current(newMarkers);
         }
 
         // Fit map to show all markers
@@ -157,7 +173,8 @@ const MapView: React.FC<MapViewProps> = ({
         }
       });
     };
-  }, [locations, mapZoomLevel, onMapLoad, onMarkersLoad, onMarkerClick]);
+    // Only re-run when locations or mapZoomLevel change, not when callbacks change
+  }, [locations, mapZoomLevel]);
 
   const createInfoWindowContent = (location: Location): string => {
     const getCurrentDayHours = () => {
@@ -231,4 +248,11 @@ const MapView: React.FC<MapViewProps> = ({
   return <div ref={mapRef} className="w-full h-full" />;
 };
 
-export default MapView;
+// Memoize to prevent unnecessary re-renders when unrelated props change
+export default memo(MapView, (prevProps, nextProps) => {
+  // Only re-render if locations or mapZoomLevel actually changed
+  return (
+    prevProps.locations === nextProps.locations &&
+    prevProps.mapZoomLevel === nextProps.mapZoomLevel
+  );
+});

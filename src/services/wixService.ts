@@ -316,15 +316,6 @@ export const setInstanceToken = (token: string): void => {
 let currentViewMode: 'Editor' | 'Preview' | 'Site' = 'Site';
 
 /**
- * ✅ WIX OFFICIAL: Set ViewMode from wixconfig attribute
- * This is called by MapsyWidgetElement when wixconfig attribute is received
- */
-export function setViewModeFromWixConfig(viewMode: 'Editor' | 'Preview' | 'Site'): void {
-  currentViewMode = viewMode;
-  console.log('[Wix] 🔄 ViewMode set from wixconfig:', currentViewMode);
-}
-
-/**
  * Get current view mode from wixconfig attribute
  */
 export function getViewMode(): 'Editor' | 'Preview' | 'Site' {

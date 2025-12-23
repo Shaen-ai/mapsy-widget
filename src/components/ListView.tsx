@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { FiPhone, FiMail, FiGlobe, FiMapPin, FiClock, FiNavigation } from 'react-icons/fi';
 import { Location } from '../types/location';
 
@@ -14,6 +15,8 @@ const ListView: React.FC<ListViewProps> = ({
   onLocationSelect,
   primaryColor = '#3B82F6',
 }) => {
+  console.log('[ListView] 📋 Rendering ListView', { locationsCount: locations.length, primaryColor });
+
   const getCurrentDayHours = (location: Location) => {
     const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const today = days[new Date().getDay()];
@@ -177,4 +180,12 @@ const ListView: React.FC<ListViewProps> = ({
   );
 };
 
-export default ListView;
+// Memoize to prevent unnecessary re-renders when unrelated props change
+export default memo(ListView, (prevProps, nextProps) => {
+  // Only re-render if locations, selectedLocation, or primaryColor actually changed
+  return (
+    prevProps.locations === nextProps.locations &&
+    prevProps.selectedLocation === nextProps.selectedLocation &&
+    prevProps.primaryColor === nextProps.primaryColor
+  );
+});

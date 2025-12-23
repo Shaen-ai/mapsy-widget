@@ -6,7 +6,6 @@ import apiService, {
   setInstanceToken,
   getWixClient,
   getAccessTokenListener,
-  setViewModeFromWixConfig,
   getViewMode
 } from './wixService';
 
@@ -21,7 +20,6 @@ export {
   setInstanceToken,
   getWixClient,
   getAccessTokenListener,
-  setViewModeFromWixConfig,
   getViewMode
 };
 
