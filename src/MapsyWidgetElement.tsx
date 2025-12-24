@@ -182,6 +182,18 @@ class MapsyWidgetElement extends HTMLElement {
   connectedCallback() {
     console.log('[Widget] 🔌 connectedCallback called', { initialized: this._initialized, hasRoot: !!this.root });
 
+    // Debug: Log all properties that might have been set
+    const props = ['defaultView', 'showHeader', 'headerTitle', 'mapZoomLevel', 'primaryColor', 'showWidgetName', 'widgetName'];
+    const foundProps: any = {};
+    props.forEach(prop => {
+      if ((this as any)[prop] !== undefined) {
+        foundProps[prop] = (this as any)[prop];
+      }
+    });
+    if (Object.keys(foundProps).length > 0) {
+      console.log('[Widget] 🔍 Found properties on element:', foundProps);
+    }
+
     if (this._initialized) {
       console.log('[Widget] ⚠️ Widget already initialized, skipping re-initialization');
       if (!this.root) {
@@ -212,69 +224,69 @@ class MapsyWidgetElement extends HTMLElement {
   ========================== */
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-    // console.log('[Widget] 🔔 attributeChangedCallback:', { name, oldValue, newValue, initialized: this._initialized });
+    console.log('[Widget] 🔔 attributeChangedCallback:', { name, oldValue, newValue, initialized: this._initialized });
 
-    // if (!this._initialized || oldValue === newValue || newValue === null) return;
+    if (!this._initialized || oldValue === newValue || newValue === null) return;
 
-    // console.log('[Widget] ✅ Attribute change accepted, updating store');
-    // const update = (obj: any) => this.store.setConfigPartial(obj);
+    console.log('[Widget] ✅ Attribute change accepted, updating store');
+    const update = (obj: any) => this.store.setConfigPartial(obj);
 
-    // switch (name) {
-    //   case 'default-view':
-    //   case 'defaultview':
-    //     update({ defaultView: newValue === 'list' ? 'list' : 'map' });
-    //     break;
-    //   case 'show-header':
-    //   case 'showheader':
-    //     update({ showHeader: newValue === 'true' });
-    //     break;
-    //   case 'header-title':
-    //   case 'headertitle':
-    //     update({ headerTitle: newValue });
-    //     break;
-    //   case 'map-zoom-level':
-    //   case 'mapzoomlevel':
-    //     update({ mapZoomLevel: parseInt(newValue, 10) });
-    //     break;
-    //   case 'primary-color':
-    //   case 'primarycolor':
-    //     update({ primaryColor: newValue });
-    //     break;
-    //   case 'show-widget-name':
-    //   case 'showwidgetname':
-    //     update({ showWidgetName: newValue === 'true' });
-    //     break;
-    //   case 'widget-name':
-    //   case 'widgetname':
-    //     update({ widgetName: newValue });
-    //     break;
-    //   case 'api-url':
-    //   case 'apiurl':
-    //     // static → do not trigger React
-    //     this.store.setConfigPartial({ apiUrl: newValue });
-    //     break;
-    //   case 'config':
-    //     try {
-    //       const parsedConfig = JSON.parse(newValue);
-    //       if (parsedConfig.auth?.instanceToken) setInstanceToken(parsedConfig.auth.instanceToken);
-    //       const { auth, ...configWithoutAuth } = parsedConfig;
-    //       this.store.setConfigPartial(configWithoutAuth);
-    //     } catch {}
-    //     break;
-    //   case 'auth':
-    //     try {
-    //       const authData = JSON.parse(newValue);
-    //       if (authData.instance) setInstanceToken(authData.instance);
-    //     } catch {}
-    //     break;
-    //   case 'compid':
-    //   case 'comp-id':
-    //     setCompId(newValue);
-    //     break;
-    //   case 'instance':
-    //     setInstanceToken(newValue);
-    //     break;
-    // }
+    switch (name) {
+      case 'default-view':
+      case 'defaultview':
+        update({ defaultView: newValue === 'list' ? 'list' : 'map' });
+        break;
+      case 'show-header':
+      case 'showheader':
+        update({ showHeader: newValue === 'true' });
+        break;
+      case 'header-title':
+      case 'headertitle':
+        update({ headerTitle: newValue });
+        break;
+      case 'map-zoom-level':
+      case 'mapzoomlevel':
+        update({ mapZoomLevel: parseInt(newValue, 10) });
+        break;
+      case 'primary-color':
+      case 'primarycolor':
+        update({ primaryColor: newValue });
+        break;
+      case 'show-widget-name':
+      case 'showwidgetname':
+        update({ showWidgetName: newValue === 'true' });
+        break;
+      case 'widget-name':
+      case 'widgetname':
+        update({ widgetName: newValue });
+        break;
+      case 'api-url':
+      case 'apiurl':
+        // static → do not trigger React
+        this.store.setConfigPartial({ apiUrl: newValue });
+        break;
+      case 'config':
+        try {
+          const parsedConfig = JSON.parse(newValue);
+          if (parsedConfig.auth?.instanceToken) setInstanceToken(parsedConfig.auth.instanceToken);
+          const { auth, ...configWithoutAuth } = parsedConfig;
+          this.store.setConfigPartial(configWithoutAuth);
+        } catch {}
+        break;
+      case 'auth':
+        try {
+          const authData = JSON.parse(newValue);
+          if (authData.instance) setInstanceToken(authData.instance);
+        } catch {}
+        break;
+      case 'compid':
+      case 'comp-id':
+        setCompId(newValue);
+        break;
+      case 'instance':
+        setInstanceToken(newValue);
+        break;
+    }
   }
 
   /* =========================
