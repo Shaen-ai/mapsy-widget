@@ -135,15 +135,18 @@ class MapsyWidget {
   }
 }
 
+// COMMENTED OUT TO PREVENT RECREATION - UNCOMMENT STEP BY STEP TO DEBUG
 // Auto-initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    MapsyWidget.autoInit();
-  });
-} else {
-  // DOM is already loaded
-  setTimeout(() => MapsyWidget.autoInit(), 0);
-}
+// if (document.readyState === 'loading') {
+//   document.addEventListener('DOMContentLoaded', () => {
+//     MapsyWidget.autoInit();
+//   });
+// } else {
+//   // DOM is already loaded
+//   setTimeout(() => MapsyWidget.autoInit(), 0);
+// }
+
+console.log('[widget-entry] ⚠️ autoInit is DISABLED - widget should only init via custom element connectedCallback');
 
 // Expose to window
 window.MapsyWidget = {

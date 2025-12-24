@@ -350,7 +350,11 @@ class MapsyWidgetElement extends HTMLElement {
     try {
       const { config, locations } = await widgetDataService.getData();
       console.log('[Widget] ✅ Backend data received:', { hasConfig: !!config, locationsCount: locations?.length });
-      if (config) this.store.setConfigPartial(config);
+
+      // COMMENTED OUT TO PREVENT OVERWRITING PROPERTY SETTER VALUES - UNCOMMENT STEP BY STEP TO DEBUG
+      // if (config) this.store.setConfigPartial(config);
+      console.log('[Widget] ⚠️ Backend config update is DISABLED to prevent overwriting setProp values');
+
       if (locations) this.store.setLocations(locations);
 
       // Premium plan logic
