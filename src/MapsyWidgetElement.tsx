@@ -58,9 +58,10 @@ export class WidgetStore {
     }
   }
 
-  // Locations are static → no emit
+  // Locations update should trigger re-render
   setLocations(locations: any[]) {
     this.state = { ...this.state, locations };
+    this.emit(); // Trigger React re-render
   }
 
   // Premium status is static → no emit
