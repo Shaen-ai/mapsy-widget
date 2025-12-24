@@ -115,6 +115,45 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   /* =========================
+     PROPERTY SETTERS (for Wix setProp)
+  ========================== */
+
+  set defaultView(value: string) {
+    console.log('[Widget] 🔧 Property setter: defaultView =', value);
+    this.store.setConfigPartial({ defaultView: value === 'list' ? 'list' : 'map' });
+  }
+
+  set showHeader(value: boolean | string) {
+    console.log('[Widget] 🔧 Property setter: showHeader =', value);
+    this.store.setConfigPartial({ showHeader: value === true || value === 'true' });
+  }
+
+  set headerTitle(value: string) {
+    console.log('[Widget] 🔧 Property setter: headerTitle =', value);
+    this.store.setConfigPartial({ headerTitle: value });
+  }
+
+  set mapZoomLevel(value: number | string) {
+    console.log('[Widget] 🔧 Property setter: mapZoomLevel =', value);
+    this.store.setConfigPartial({ mapZoomLevel: typeof value === 'number' ? value : parseInt(value, 10) });
+  }
+
+  set primaryColor(value: string) {
+    console.log('[Widget] 🔧 Property setter: primaryColor =', value);
+    this.store.setConfigPartial({ primaryColor: value });
+  }
+
+  set showWidgetName(value: boolean | string) {
+    console.log('[Widget] 🔧 Property setter: showWidgetName =', value);
+    this.store.setConfigPartial({ showWidgetName: value === true || value === 'true' });
+  }
+
+  set widgetName(value: string) {
+    console.log('[Widget] 🔧 Property setter: widgetName =', value);
+    this.store.setConfigPartial({ widgetName: value });
+  }
+
+  /* =========================
      ATTRIBUTES
   ========================== */
 
