@@ -294,29 +294,38 @@ class MapsyWidgetElement extends HTMLElement {
   ========================== */
 
   private readInitialAttributes() {
-    const read = (kebab: string, camel: string) => this.getAttribute(kebab) ?? this.getAttribute(camel);
+    // Read from both attributes AND properties (Wix setProp sets properties, not attributes)
+    const read = (kebab: string, camel: string, propName: string) => {
+      // Check property first (from setProp), then fall back to attributes
+      const propValue = (this as any)[propName];
+      if (propValue !== undefined) {
+        console.log(`[Widget] 📖 Reading ${propName} from property:`, propValue);
+        return propValue;
+      }
+      return this.getAttribute(kebab) ?? this.getAttribute(camel);
+    };
 
     const partial: any = {};
-    const defaultView = read('default-view', 'defaultview');
+    const defaultView = read('default-view', 'defaultview', 'defaultView');
     if (defaultView) partial.defaultView = defaultView === 'list' ? 'list' : 'map';
-    const showHeader = read('show-header', 'showheader');
-    if (showHeader !== null) partial.showHeader = showHeader === 'true';
-    const headerTitle = read('header-title', 'headertitle');
+    const showHeader = read('show-header', 'showheader', 'showHeader');
+    if (showHeader !== null) partial.showHeader = showHeader === 'true' || showHeader === true;
+    const headerTitle = read('header-title', 'headertitle', 'headerTitle');
     if (headerTitle) partial.headerTitle = headerTitle;
-    const zoom = read('map-zoom-level', 'mapzoomlevel');
-    if (zoom) partial.mapZoomLevel = parseInt(zoom, 10);
-    const color = read('primary-color', 'primarycolor');
+    const zoom = read('map-zoom-level', 'mapzoomlevel', 'mapZoomLevel');
+    if (zoom) partial.mapZoomLevel = typeof zoom === 'number' ? zoom : parseInt(zoom, 10);
+    const color = read('primary-color', 'primarycolor', 'primaryColor');
     if (color) partial.primaryColor = color;
-    const showName = read('show-widget-name', 'showwidgetname');
-    if (showName !== null) partial.showWidgetName = showName === 'true';
-    const widgetName = read('widget-name', 'widgetname');
+    const showName = read('show-widget-name', 'showwidgetname', 'showWidgetName');
+    if (showName !== null) partial.showWidgetName = showName === 'true' || showName === true;
+    const widgetName = read('widget-name', 'widgetname', 'widgetName');
     if (widgetName) partial.widgetName = widgetName;
-    const apiUrl = read('api-url', 'apiurl');
+    const apiUrl = read('api-url', 'apiurl', 'apiUrl');
     if (apiUrl) partial.apiUrl = apiUrl;
 
     if (Object.keys(partial).length > 0) this.store.setConfigPartial(partial);
 
-    const compId = read('compid', 'comp-id');
+    const compId = read('compid', 'comp-id', 'compId');
     if (compId) setCompId(compId);
     const instance = this.getAttribute('instance');
     if (instance) setInstanceToken(instance);
