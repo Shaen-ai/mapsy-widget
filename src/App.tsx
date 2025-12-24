@@ -45,12 +45,12 @@ function App({ store }: AppProps) {
     return unsubscribe;
   }, [store]);
 
-  // Separate effect to update current view when defaultView changes
+  // Separate effect to update current view when defaultView changes (from external source)
   useEffect(() => {
-    if (state.config.defaultView && state.config.defaultView !== currentView) {
+    if (state.config.defaultView) {
       setCurrentView(state.config.defaultView);
     }
-  }, [state.config.defaultView, currentView]);
+  }, [state.config.defaultView]);
 
   // Extract values from state
   const { config, locations, shouldHideWidget, showFreePlanNotice } = state;
