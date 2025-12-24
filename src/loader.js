@@ -119,30 +119,33 @@
         console.log('Mapsy Widget loaded successfully');
         window.MapsyWidgetLoaded = true;
 
+        // COMMENTED OUT TO PREVENT RECREATION - UNCOMMENT STEP BY STEP TO DEBUG
         // Initialize widget if function exists
-        if (typeof window.MapsyWidget !== 'undefined' && typeof window.MapsyWidget.init === 'function') {
-          // Get config from script tag
-          const script = document.currentScript || document.querySelector('script[src*="mapsy-widget"]');
-          if (script) {
-            const config = {
-              container: script.getAttribute('data-container') || 'mapsy-widget',
-              apiUrl: script.getAttribute('data-api-url') || undefined
-            };
+        // if (typeof window.MapsyWidget !== 'undefined' && typeof window.MapsyWidget.init === 'function') {
+        //   // Get config from script tag
+        //   const script = document.currentScript || document.querySelector('script[src*="mapsy-widget"]');
+        //   if (script) {
+        //     const config = {
+        //       container: script.getAttribute('data-container') || 'mapsy-widget',
+        //       apiUrl: script.getAttribute('data-api-url') || undefined
+        //     };
 
-            // Auto-initialize for all mapsy-widget elements
-            const widgets = document.querySelectorAll('mapsy-widget');
-            if (widgets.length > 0) {
-              widgets.forEach((widget, index) => {
-                const widgetConfig = {
-                  ...config,
-                  container: widget,
-                  apiUrl: widget.getAttribute('data-api-url') || config.apiUrl
-                };
-                window.MapsyWidget.init(widgetConfig);
-              });
-            }
-          }
-        }
+        //     // Auto-initialize for all mapsy-widget elements
+        //     const widgets = document.querySelectorAll('mapsy-widget');
+        //     if (widgets.length > 0) {
+        //       widgets.forEach((widget, index) => {
+        //         const widgetConfig = {
+        //           ...config,
+        //           container: widget,
+        //           apiUrl: widget.getAttribute('data-api-url') || config.apiUrl
+        //         };
+        //         window.MapsyWidget.init(widgetConfig);
+        //       });
+        //     }
+        //   }
+        // }
+
+        console.log('[Loader] ⚠️ Auto-init is DISABLED - widget should only init via connectedCallback');
 
         // Fire custom event
         const event = new CustomEvent('MapsyWidgetReady', {

@@ -18,6 +18,9 @@ declare global {
 
 class MapsyWidget {
   static init(selectorOrConfig?: string | HTMLElement | any, config?: any) {
+    console.log('[MapsyWidget.init] 🚀 Called with:', { selectorOrConfig, config });
+    console.trace('[MapsyWidget.init] Call stack');
+
     // Handle different parameter types
     if (!selectorOrConfig) {
       // No parameters - auto init
@@ -73,6 +76,8 @@ class MapsyWidget {
   }
 
   private static createWidget(element: HTMLElement, config?: any) {
+    console.log('[MapsyWidget.createWidget] 🏗️ Called with element:', element.tagName, 'config:', config);
+
     // Defensive check: ensure element exists
     if (!element) {
       console.error('[MapsyWidget] Cannot create widget: element is null or undefined');
@@ -81,6 +86,7 @@ class MapsyWidget {
 
     // If element is already a mapsy-widget, just update its config
     if (element.tagName.toLowerCase() === 'mapsy-widget') {
+      console.log('[MapsyWidget.createWidget] ✅ Element is already mapsy-widget, updating config only');
       if (config) {
         // ✅ NEW: Use direct method API instead of setAttribute
         // This updates state directly without string conversion
@@ -96,22 +102,26 @@ class MapsyWidget {
     }
 
     // Otherwise, create a new mapsy-widget element inside
-    const widget = document.createElement('mapsy-widget') as any;
+    console.log('[MapsyWidget.createWidget] ⚠️ Element is NOT mapsy-widget, SKIPPING recreation (commented out)');
 
-    // Apply configuration using direct method API if available
-    if (config) {
-      // Wait for element to be connected and initialized
-      if (typeof widget.setConfig === 'function') {
-        widget.setConfig(config);
-      } else {
-        // Set as attribute initially, will be parsed on connection
-        widget.setAttribute('config', JSON.stringify(config));
-      }
-    }
+    // COMMENTED OUT TO PREVENT RECREATION - UNCOMMENT STEP BY STEP TO DEBUG
+    // const widget = document.createElement('mapsy-widget') as any;
 
-    // Clear element and add widget
-    element.innerHTML = '';
-    element.appendChild(widget);
+    // // Apply configuration using direct method API if available
+    // if (config) {
+    //   // Wait for element to be connected and initialized
+    //   if (typeof widget.setConfig === 'function') {
+    //     widget.setConfig(config);
+    //   } else {
+    //     // Set as attribute initially, will be parsed on connection
+    //     widget.setAttribute('config', JSON.stringify(config));
+    //   }
+    // }
+
+    // // Clear element and add widget
+    // console.log('[MapsyWidget.createWidget] 🗑️ Clearing innerHTML and appending new widget');
+    // element.innerHTML = '';
+    // element.appendChild(widget);
   }
 
   static getVersion() {

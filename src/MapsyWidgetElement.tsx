@@ -216,6 +216,8 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   disconnectedCallback() {
+    console.log('[Widget] 🔌❌ disconnectedCallback - Widget is being removed from DOM!');
+    console.trace('[Widget] Disconnect stack trace');
     // Do nothing. Keep store and state intact
   }
 
