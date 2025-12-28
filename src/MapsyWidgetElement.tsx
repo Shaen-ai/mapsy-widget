@@ -64,7 +64,7 @@ export class WidgetStore {
     this.emit(); // Trigger React re-render
   }
 
-  // Premium status is static → no emit
+  // Premium status update triggers re-render for widget visibility and popup
   setPremiumStatus(premiumPlanName?: string, shouldHideWidget?: boolean, showFreePlanNotice?: boolean) {
     this.state = {
       ...this.state,
@@ -72,6 +72,7 @@ export class WidgetStore {
       shouldHideWidget,
       showFreePlanNotice
     };
+    this.emit();
   }
 
   subscribe(listener: Listener) {
