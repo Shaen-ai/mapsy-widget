@@ -106,7 +106,7 @@ class MapsyWidgetElement extends HTMLElement {
     // Default store config
     this.store = new WidgetStore({
       defaultView: 'map',
-      showHeader: false,
+      showHeader: true,
       headerTitle: 'Our Locations',
       mapZoomLevel: 12,
       primaryColor: '#3B82F6',
