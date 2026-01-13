@@ -5,7 +5,8 @@ import {
   setCompId,
   setInstanceToken,
   getAccessTokenListener,
-  widgetDataService
+  widgetDataService,
+  initializeApi
 } from './services/api';
 
 /* =========================
@@ -209,9 +210,19 @@ class MapsyWidgetElement extends HTMLElement {
     this._initialized = true;
     console.log('[Widget] 🆕 First time initialization');
 
-    requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
       if (!this.isConnected) return;
       this.readInitialAttributes();
+
+      // Initialize Wix API BEFORE making any requests
+      try {
+        console.log('[Widget] 🔄 Initializing API...');
+        await initializeApi();
+        console.log('[Widget] ✅ API initialized');
+      } catch (error) {
+        console.error('[Widget] ❌ API initialization failed:', error);
+      }
+
       this.mountReactOnce();
       this.fetchBackendOnce();
     });
@@ -349,6 +360,7 @@ class MapsyWidgetElement extends HTMLElement {
     this._backendFetched = true;
 
     console.log('[Widget] 🌐 Fetching data from backend...');
+    console.log('[Widget] 🔍 About to make request - check if compId is set in wixService');
     try {
       const { config, locations } = await widgetDataService.getData();
       console.log('[Widget] ✅ Backend data received:', { hasConfig: !!config, locationsCount: locations?.length });
