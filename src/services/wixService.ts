@@ -13,6 +13,19 @@ let isWixEnvironment = false;
 // Access token listener - stored as per Wix example
 let accessTokenListener: any = null;
 
+/**
+ * Generate a unique compId with timestamp
+ */
+function generateCompId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const timestamp = Date.now();
+  let randomPart = '';
+  for (let i = 0; i < 8; i++) {
+    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `comp-${timestamp}-${randomPart}`;
+}
+
 // Create Wix client with site authentication (as per Wix docs for self-hosted apps)
 console.log('[WixClient] 🔄 Attempting to create Wix client...');
 console.log('[WixClient] APP_ID:', APP_ID);
@@ -247,6 +260,46 @@ const initializeWixData = async (): Promise<void> => {
     console.log('[WixInit] ⏭️  CompId already set (skipping extraction):', compId);
   }
 
+  // If still no compId, try to get it from widget props or generate a new one
+  if (!compId && isWixEnvironment && wixClient) {
+    console.log('[WixInit] 🔍 No compId found, checking widget props...');
+
+    // Try to get existing compId from widget props (persistent site data)
+    if (wixClient.widget && wixClient.widget.getProp) {
+      try {
+        const existingCompId = await wixClient.widget.getProp('compId');
+        if (existingCompId) {
+          compId = existingCompId as string;
+          console.log('[WixInit] ✅ Got existing compId from widget props:', compId);
+        }
+      } catch (e) {
+        console.warn('[WixInit] ⚠️ Could not read compId from widget props:', e);
+      }
+    }
+
+    // If no compId exists, generate one and save it to widget props
+    if (!compId) {
+      compId = generateCompId();
+      console.log('[WixInit] 🆕 Generated new compId:', compId);
+
+      // Save to persistent storage
+      if (wixClient.widget && wixClient.widget.setProp) {
+        try {
+          await wixClient.widget.setProp('compId', compId);
+          console.log('[WixInit] ✅ Saved compId to widget props');
+        } catch (e) {
+          console.warn('[WixInit] ⚠️ Could not save compId to widget props:', e);
+        }
+      }
+    }
+  }
+
+  // Fallback: Even if Wix SDK fails, ensure we have a compId
+  if (!compId) {
+    compId = generateCompId();
+    console.log('[WixInit] 🔄 Fallback: Generated compId (not persisted):', compId);
+  }
+
   // Extract instanceToken if not already set
   if (!instanceToken) {
     const urlInstance = extractInstanceFromUrl();
@@ -266,17 +319,14 @@ const initializeWixData = async (): Promise<void> => {
 
   // Final summary
   console.log('[WixInit] ========== SUMMARY ==========');
-  console.log('[WixInit] compId:', compId || 'NOT SET (will fetch default data)');
+  console.log('[WixInit] compId:', compId || 'NOT SET');
   console.log('[WixInit] instanceToken (manual):', instanceToken ? 'present' : 'null (will use fetchWithAuth)');
   console.log('[WixInit] isWixEnvironment:', isWixEnvironment);
   console.log('[WixInit] wixClient.fetchWithAuth available:', !!wixClient?.fetchWithAuth);
   console.log('[WixInit] ==============================');
 
-  if (!compId) {
-    console.log('[WixInit] ⚠️ No compId found - will fetch default/demo data without authentication');
-    console.log('[WixInit] 💡 Tip: Open settings panel to generate and save a compId');
-  } else {
-    console.log('[WixInit] ✅ CompId found - will fetch widget-specific data with authentication');
+  if (compId) {
+    console.log('[WixInit] ✅ CompId ready - will fetch widget-specific data with authentication');
   }
 };
 
