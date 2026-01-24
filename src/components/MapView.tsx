@@ -1,6 +1,7 @@
-import { useEffect, useRef, memo } from 'react';
+import { useEffect, useRef, memo, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import { Location } from '../types/location';
+import { FiX, FiMapPin, FiPhone, FiMail, FiGlobe, FiClock, FiNavigation } from 'react-icons/fi';
 
 interface MapViewProps {
   locations: Location[];
@@ -9,6 +10,23 @@ interface MapViewProps {
   onMarkersLoad?: (markers: google.maps.Marker[]) => void;
   onMarkerClick?: (location: Location) => void;
 }
+
+// Hook to detect mobile screen
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
 
 const MapView: React.FC<MapViewProps> = ({
   locations,
@@ -23,6 +41,10 @@ const MapView: React.FC<MapViewProps> = ({
   const mapInstance = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<any[]>([]); // Using any for now as AdvancedMarkerElement types might not be available
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+
+  // Mobile popup state
+  const [mobileSelectedLocation, setMobileSelectedLocation] = useState<Location | null>(null);
+  const isMobile = useIsMobile();
 
   // Store callbacks in refs so they don't trigger effect re-runs
   const onMapLoadRef = useRef(onMapLoad);
@@ -99,11 +121,25 @@ const MapView: React.FC<MapViewProps> = ({
 
               // Add click listener to marker
               marker.addListener('click', () => {
-                if (infoWindowRef.current && mapInstance.current) {
-                  const content = createInfoWindowContent(location);
-                  infoWindowRef.current.setContent(content);
-                  infoWindowRef.current.open(mapInstance.current, marker as any);
+                // Check if mobile at click time
+                const isMobileNow = window.innerWidth < 768;
+                
+                if (isMobileNow) {
+                  // On mobile, show bottom sheet popup
+                  setMobileSelectedLocation(location);
+                  // Close any open InfoWindow
+                  if (infoWindowRef.current) {
+                    infoWindowRef.current.close();
+                  }
+                } else {
+                  // On desktop, show InfoWindow
+                  if (infoWindowRef.current && mapInstance.current) {
+                    const content = createInfoWindowContent(location);
+                    infoWindowRef.current.setContent(content);
+                    infoWindowRef.current.open(mapInstance.current, marker as any);
+                  }
                 }
+                
                 if (onMarkerClickRef.current) {
                   onMarkerClickRef.current(location);
                 }
@@ -121,11 +157,25 @@ const MapView: React.FC<MapViewProps> = ({
 
               // Add click listener to marker
               marker.addListener('click', () => {
-                if (infoWindowRef.current && mapInstance.current) {
-                  const content = createInfoWindowContent(location);
-                  infoWindowRef.current.setContent(content);
-                  infoWindowRef.current.open(mapInstance.current, marker);
+                // Check if mobile at click time
+                const isMobileNow = window.innerWidth < 768;
+                
+                if (isMobileNow) {
+                  // On mobile, show bottom sheet popup
+                  setMobileSelectedLocation(location);
+                  // Close any open InfoWindow
+                  if (infoWindowRef.current) {
+                    infoWindowRef.current.close();
+                  }
+                } else {
+                  // On desktop, show InfoWindow
+                  if (infoWindowRef.current && mapInstance.current) {
+                    const content = createInfoWindowContent(location);
+                    infoWindowRef.current.setContent(content);
+                    infoWindowRef.current.open(mapInstance.current, marker);
+                  }
                 }
+                
                 if (onMarkerClickRef.current) {
                   onMarkerClickRef.current(location);
                 }
@@ -245,7 +295,173 @@ const MapView: React.FC<MapViewProps> = ({
     `;
   };
 
-  return <div ref={mapRef} className="w-full h-full" />;
+  // Get current day hours for mobile popup
+  const getCurrentDayHours = (location: Location) => {
+    const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const today = days[new Date().getDay()];
+    return location.business_hours?.[today as keyof typeof location.business_hours] || 'Closed';
+  };
+
+  // Close mobile popup
+  const closeMobilePopup = () => {
+    setMobileSelectedLocation(null);
+  };
+
+  return (
+    <div className="relative w-full h-full">
+      <div ref={mapRef} className="w-full h-full" />
+      
+      {/* Mobile Bottom Sheet Popup */}
+      {mobileSelectedLocation && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/40 z-40 md:hidden"
+            onClick={closeMobilePopup}
+          />
+          
+          {/* Bottom Sheet */}
+          <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden animate-slide-up">
+            <div className="bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden">
+              {/* Handle bar */}
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+              </div>
+              
+              {/* Close button */}
+              <button
+                onClick={closeMobilePopup}
+                className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors z-10"
+              >
+                <FiX className="w-5 h-5 text-gray-600" />
+              </button>
+              
+              {/* Content */}
+              <div className="px-5 pb-8 pt-2 overflow-y-auto max-h-[calc(85vh-60px)]">
+                {/* Image */}
+                {mobileSelectedLocation.image_url && (
+                  <div className="relative -mx-5 mb-4">
+                    <img
+                      src={mobileSelectedLocation.image_url}
+                      alt={mobileSelectedLocation.name}
+                      className="w-full h-44 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                  </div>
+                )}
+                
+                {/* Location Name & Category */}
+                <div className="mb-4">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                    {mobileSelectedLocation.name}
+                  </h3>
+                  {mobileSelectedLocation.category && (
+                    <span className="inline-block px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full capitalize">
+                      {mobileSelectedLocation.category}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Info Grid */}
+                <div className="space-y-4 mb-6">
+                  {/* Address */}
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
+                      <FiMapPin className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <div className="flex-1 pt-1">
+                      <p className="text-sm text-gray-500 font-medium">Address</p>
+                      <p className="text-gray-900">{mobileSelectedLocation.address}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Phone */}
+                  {mobileSelectedLocation.phone && (
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+                        <FiPhone className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <p className="text-sm text-gray-500 font-medium">Phone</p>
+                        <a 
+                          href={`tel:${mobileSelectedLocation.phone}`}
+                          className="text-blue-600 font-medium"
+                        >
+                          {mobileSelectedLocation.phone}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Email */}
+                  {mobileSelectedLocation.email && (
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                        <FiMail className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <p className="text-sm text-gray-500 font-medium">Email</p>
+                        <a 
+                          href={`mailto:${mobileSelectedLocation.email}`}
+                          className="text-blue-600 font-medium break-all"
+                        >
+                          {mobileSelectedLocation.email}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Website */}
+                  {mobileSelectedLocation.website && (
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                        <FiGlobe className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <p className="text-sm text-gray-500 font-medium">Website</p>
+                        <a 
+                          href={mobileSelectedLocation.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 font-medium break-all"
+                        >
+                          {mobileSelectedLocation.website.replace(/^https?:\/\//, '')}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Today's Hours */}
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                      <FiClock className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div className="flex-1 pt-1">
+                      <p className="text-sm text-gray-500 font-medium">Today's Hours</p>
+                      <p className="text-gray-900 font-semibold">
+                        {getCurrentDayHours(mobileSelectedLocation)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Get Directions Button */}
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mobileSelectedLocation.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-3 w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-2xl shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-transform"
+                >
+                  <FiNavigation className="w-5 h-5" />
+                  Get Directions
+                </a>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 // Memoize to prevent unnecessary re-renders when unrelated props change
