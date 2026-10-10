@@ -13,19 +13,6 @@ let isWixEnvironment = false;
 // Access token listener - stored as per Wix example
 let accessTokenListener: any = null;
 
-/**
- * Generate a unique compId with timestamp
- */
-function generateCompId(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const timestamp = Date.now();
-  let randomPart = '';
-  for (let i = 0; i < 8; i++) {
-    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `comp-${timestamp}-${randomPart}`;
-}
-
 // Create Wix client with site authentication (as per Wix docs for self-hosted apps)
 console.log('[WixClient] 🔄 Attempting to create Wix client...');
 console.log('[WixClient] APP_ID:', APP_ID);
@@ -103,50 +90,36 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Get compId from Wix widget element's data attributes or parent Wix component
+ * Get compId only from the mapsy-widget element itself (never steal another Wix comp-* id).
  */
 const extractCompIdFromElement = (): string | null => {
   if (typeof document === 'undefined') return null;
 
-  // Check wix-internal-id element (Wix iframe container)
-  const wixInternalEl = document.getElementById('wix-internal-id');
-  if (wixInternalEl) {
-    // Check for data attributes that might contain compId
-    const dataCompId = wixInternalEl.getAttribute('data-comp-id') ||
-                       wixInternalEl.getAttribute('data-wix-comp-id');
-    if (dataCompId) {
-      console.log('[Wix] ✅ CompId from wix-internal-id:', dataCompId);
-      return dataCompId;
-    }
+  const widget = document.querySelector('mapsy-widget') as HTMLElement | null;
+  if (!widget) return null;
+
+  // Property first (Wix setProp), then attributes
+  const propCompId = (widget as any).compId;
+  if (typeof propCompId === 'string' && propCompId.trim()) {
+    console.log('[Wix] ✅ CompId from widget property:', propCompId);
+    return propCompId.trim();
   }
 
-  // Look for mapsy-widget element
-  const widget = document.querySelector('mapsy-widget');
-  if (widget) {
-    // Check various attribute patterns Wix might use
-    const wixCompId = widget.getAttribute('wix-comp-id') ||
-                      widget.getAttribute('data-comp-id') ||
-                      widget.getAttribute('data-wix-comp-id') ||
-                      widget.getAttribute('compid');
-    if (wixCompId) {
-      console.log('[Wix] ✅ CompId from widget attribute:', wixCompId);
-      return wixCompId;
-    }
-
-    // Check if the widget element itself has an id starting with 'comp-'
-    // This is how Wix assigns component IDs in the editor
-    const widgetId = widget.id;
-    if (widgetId && widgetId.startsWith('comp-')) {
-      console.log('[Wix] ✅ CompId from widget element id:', widgetId);
-      return widgetId;
-    }
+  const wixCompId = widget.getAttribute('wix-comp-id') ||
+                    widget.getAttribute('data-comp-id') ||
+                    widget.getAttribute('data-wix-comp-id') ||
+                    widget.getAttribute('compid') ||
+                    widget.getAttribute('comp-id');
+  if (wixCompId) {
+    console.log('[Wix] ✅ CompId from widget attribute:', wixCompId);
+    return wixCompId;
   }
 
-  // Check for comp id in any element on the page
-  const compElements = document.querySelectorAll('[id^="comp-"]');
-  if (compElements.length > 0) {
-    console.log('[Wix] ✅ CompId from DOM element:', compElements[0].id);
-    return compElements[0].id;
+  // Only the mapsy-widget element's own id — never first [id^=comp-] on the page
+  const widgetId = widget.id;
+  if (widgetId && widgetId.startsWith('comp-')) {
+    console.log('[Wix] ✅ CompId from widget element id:', widgetId);
+    return widgetId;
   }
 
   return null;
@@ -260,11 +233,10 @@ const initializeWixData = async (): Promise<void> => {
     console.log('[WixInit] ⏭️  CompId already set (skipping extraction):', compId);
   }
 
-  // If still no compId, try to get it from widget props or generate a new one
+  // If still no compId, try to get it from widget props (do NOT generate a throwaway id)
   if (!compId && isWixEnvironment && wixClient) {
     console.log('[WixInit] 🔍 No compId found, checking widget props...');
 
-    // Try to get existing compId from widget props (persistent site data)
     if (wixClient.widget && wixClient.widget.getProp) {
       try {
         const existingCompId = await wixClient.widget.getProp('compId');
@@ -276,28 +248,10 @@ const initializeWixData = async (): Promise<void> => {
         console.warn('[WixInit] ⚠️ Could not read compId from widget props:', e);
       }
     }
-
-    // If no compId exists, generate one and save it to widget props
-    if (!compId) {
-      compId = generateCompId();
-      console.log('[WixInit] 🆕 Generated new compId:', compId);
-
-      // Save to persistent storage
-      if (wixClient.widget && wixClient.widget.setProp) {
-        try {
-          await wixClient.widget.setProp('compId', compId);
-          console.log('[WixInit] ✅ Saved compId to widget props');
-        } catch (e) {
-          console.warn('[WixInit] ⚠️ Could not save compId to widget props:', e);
-        }
-      }
-    }
   }
 
-  // Fallback: Even if Wix SDK fails, ensure we have a compId
   if (!compId) {
-    compId = generateCompId();
-    console.log('[WixInit] 🔄 Fallback: Generated compId (not persisted):', compId);
+    console.log('[WixInit] ⚠️ No compId — will omit X-Wix-Comp-Id and let backend use instanceId');
   }
 
   // Extract instanceToken if not already set
@@ -370,6 +324,14 @@ let currentViewMode: 'Editor' | 'Preview' | 'Site' = 'Site';
  */
 export function getViewMode(): 'Editor' | 'Preview' | 'Site' {
   return currentViewMode;
+}
+
+/**
+ * Set view mode from wixconfig attribute or URL heuristics
+ */
+export function setViewMode(mode: 'Editor' | 'Preview' | 'Site'): void {
+  currentViewMode = mode;
+  console.log('[Wix] ViewMode set to:', mode);
 }
 
 /**

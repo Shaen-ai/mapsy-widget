@@ -3,10 +3,13 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import {
   setCompId,
+  getCompId,
   setInstanceToken,
   getAccessTokenListener,
   widgetDataService,
-  initializeApi
+  initializeApi,
+  setViewMode,
+  getViewMode as getWixViewMode
 } from './services/api';
 
 /* =========================
@@ -105,6 +108,7 @@ class MapsyWidgetElement extends HTMLElement {
   private store: WidgetStore;
   public _initialized = false;
   private _backendFetched = false;
+  private _compIdProp: string | undefined;
   private accessTokenListener: any;
 
   constructor() {
@@ -163,6 +167,24 @@ class MapsyWidgetElement extends HTMLElement {
   set widgetName(value: string) {
     console.log('[Widget] 🔧 Property setter: widgetName =', value);
     this.store.setConfigPartial({ widgetName: value });
+  }
+
+  get compId(): string | undefined {
+    return this._compIdProp;
+  }
+
+  set compId(value: string) {
+    console.log('[Widget] 🔧 Property setter: compId =', value);
+    if (!value || typeof value !== 'string') return;
+    const next = value.trim();
+    if (!next) return;
+    const prev = getCompId();
+    this._compIdProp = next;
+    setCompId(next);
+    // Refetch when Wix setProp delivers compId after first paint
+    if (this._initialized && prev !== next) {
+      void this.refetchBackend();
+    }
   }
 
   /* =========================
@@ -305,11 +327,19 @@ class MapsyWidgetElement extends HTMLElement {
         } catch {}
         break;
       case 'compid':
-      case 'comp-id':
+      case 'comp-id': {
+        const prev = getCompId();
         setCompId(newValue);
+        if (prev !== newValue) {
+          void this.refetchBackend();
+        }
         break;
+      }
       case 'instance':
         setInstanceToken(newValue);
+        break;
+      case 'wixconfig':
+        this.applyWixConfig(newValue);
         break;
     }
   }
@@ -354,11 +384,44 @@ class MapsyWidgetElement extends HTMLElement {
     if (compId) setCompId(compId);
     const instance = this.getAttribute('instance');
     if (instance) setInstanceToken(instance);
+
+    const wixconfig = this.getAttribute('wixconfig');
+    if (wixconfig) this.applyWixConfig(wixconfig);
+    else this.syncViewModeFromUrl();
+  }
+
+  private applyWixConfig(raw: string) {
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const mode = parsed?.viewMode || parsed?.viewmode;
+      if (mode === 'Editor' || mode === 'Preview' || mode === 'Site') {
+        setViewMode(mode);
+        return;
+      }
+    } catch {
+      // ignore malformed wixconfig
+    }
+    this.syncViewModeFromUrl();
+  }
+
+  private syncViewModeFromUrl() {
+    const url = window.location.href.toLowerCase();
+    if (url.includes('editor.wix.com') || url.includes('editor-x.wix.com') || url.includes('static.parastorage.com')) {
+      setViewMode('Editor');
+    } else {
+      setViewMode(getWixViewMode() || 'Site');
+    }
   }
 
   /* =========================
-     BACKEND FETCH (ONCE)
+     BACKEND FETCH
   ========================== */
+
+  private async refetchBackend() {
+    console.log('[Widget] 🔄 refetchBackend — compId arrived after first load');
+    this._backendFetched = false;
+    await this.fetchBackendOnce();
+  }
 
   private async fetchBackendOnce() {
     console.log('[Widget] 📡 fetchBackendOnce called', { alreadyFetched: this._backendFetched });
@@ -404,6 +467,10 @@ class MapsyWidgetElement extends HTMLElement {
   }
 
   private getViewMode(): string {
+    const fromService = getWixViewMode();
+    if (fromService === 'Editor' || fromService === 'Preview' || fromService === 'Site') {
+      return fromService;
+    }
     const url = window.location.href.toLowerCase();
     if (url.includes('editor.wix.com') || url.includes('editor-x.wix.com') || url.includes('static.parastorage.com')) return 'Editor';
     return 'Site';

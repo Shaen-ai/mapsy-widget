@@ -6,7 +6,8 @@ import apiService, {
   setInstanceToken,
   getWixClient,
   getAccessTokenListener,
-  getViewMode
+  getViewMode,
+  setViewMode
 } from './wixService';
 
 // Backend API URL
@@ -20,7 +21,8 @@ export {
   setInstanceToken,
   getWixClient,
   getAccessTokenListener,
-  getViewMode
+  getViewMode,
+  setViewMode
 };
 
 // Initialize API
