@@ -1,6 +1,6 @@
 import { memo } from 'react';
-import { FiPhone, FiMail, FiGlobe, FiMapPin, FiClock, FiNavigation } from 'react-icons/fi';
-import { Location } from '../types/location';
+import { FiPhone, FiMail, FiGlobe, FiMapPin, FiClock, FiNavigation, FiTarget } from 'react-icons/fi';
+import { Location, formatRadiusLabel } from '../types/location';
 
 interface ListViewProps {
   locations: Location[];
@@ -93,6 +93,13 @@ const ListView: React.FC<ListViewProps> = ({
                     <FiMapPin className="flex-shrink-0 mt-0.5" size={16} />
                     <span>{location.address}</span>
                   </div>
+
+                  {formatRadiusLabel(location.radius, location.radius_unit) && (
+                    <div className="flex items-center gap-2">
+                      <FiTarget className="flex-shrink-0" size={16} />
+                      <span>Radius: {formatRadiusLabel(location.radius, location.radius_unit)}</span>
+                    </div>
+                  )}
 
                   {location.phone && (
                     <div className="flex items-center gap-2">

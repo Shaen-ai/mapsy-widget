@@ -53,7 +53,7 @@ function App({ store }: AppProps) {
   }, [state.config.defaultView]);
 
   // Extract values from state
-  const { config, locations, shouldHideWidget, showFreePlanNotice } = state;
+  const { config, locations, locationsReady, shouldHideWidget, showFreePlanNotice } = state;
 
   const handleLocationSelect = useCallback((location: Location) => {
     setSelectedLocation(location);
@@ -101,7 +101,8 @@ function App({ store }: AppProps) {
     return null;
   }
 
-  if (initializing) {
+  // Wait for API init and locations fetch so the map never paints NYC then jumps
+  if (initializing || !locationsReady) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -186,6 +187,7 @@ function App({ store }: AppProps) {
           <MapView
             locations={locations}
             mapZoomLevel={memoizedConfig.mapZoomLevel}
+            primaryColor={memoizedConfig.primaryColor}
             onMapLoad={setMapInstance}
             onMarkersLoad={setMarkers}
             onMarkerClick={setSelectedLocation}

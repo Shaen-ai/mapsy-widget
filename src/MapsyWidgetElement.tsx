@@ -18,6 +18,7 @@ type Listener = () => void;
 type WidgetState = {
   config: any;
   locations: any[];
+  locationsReady: boolean;
   premiumPlanName?: string;
   shouldHideWidget?: boolean;
   showFreePlanNotice?: boolean;
@@ -35,6 +36,7 @@ export class WidgetStore {
     this.state = {
       config: initialConfig,
       locations: [],
+      locationsReady: false,
       shouldHideWidget: false,
       showFreePlanNotice: false
     };
@@ -60,9 +62,14 @@ export class WidgetStore {
   }
 
   // Locations update should trigger re-render
-  setLocations(locations: any[]) {
-    this.state = { ...this.state, locations };
+  setLocations(locations: any[], ready = true) {
+    this.state = { ...this.state, locations, locationsReady: ready };
     this.emit(); // Trigger React re-render
+  }
+
+  setLocationsReady(ready: boolean) {
+    this.state = { ...this.state, locationsReady: ready };
+    this.emit();
   }
 
   // Premium status update triggers re-render for widget visibility and popup
@@ -223,8 +230,9 @@ class MapsyWidgetElement extends HTMLElement {
         console.error('[Widget] ❌ API initialization failed:', error);
       }
 
+      // Fetch locations before mounting so MapView never paints NYC then jumps
+      await this.fetchBackendOnce();
       this.mountReactOnce();
-      this.fetchBackendOnce();
     });
   }
 
@@ -369,7 +377,7 @@ class MapsyWidgetElement extends HTMLElement {
       // if (config) this.store.setConfigPartial(config);
       console.log('[Widget] ⚠️ Backend config update is DISABLED to prevent overwriting setProp values');
 
-      if (locations) this.store.setLocations(locations);
+      this.store.setLocations(Array.isArray(locations) ? locations : []);
 
       // Premium plan logic
       if (config?.premiumPlanName) {
@@ -388,6 +396,8 @@ class MapsyWidgetElement extends HTMLElement {
       }
     } catch (e) {
       console.error('[Widget] ❌ Backend fetch failed:', e);
+      // Still mark ready so map can show NYC default with empty locations
+      this.store.setLocations([]);
     }
   }
 

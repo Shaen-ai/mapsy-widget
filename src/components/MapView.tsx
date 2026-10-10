@@ -1,11 +1,12 @@
 import { useEffect, useRef, memo, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
-import { Location } from '../types/location';
-import { FiX, FiMapPin, FiPhone, FiMail, FiGlobe, FiClock, FiNavigation } from 'react-icons/fi';
+import { Location, formatRadiusLabel, radiusToMeters } from '../types/location';
+import { FiX, FiMapPin, FiPhone, FiMail, FiGlobe, FiClock, FiNavigation, FiTarget } from 'react-icons/fi';
 
 interface MapViewProps {
   locations: Location[];
   mapZoomLevel?: number;
+  primaryColor?: string;
   onMapLoad?: (map: google.maps.Map) => void;
   onMarkersLoad?: (markers: google.maps.Marker[]) => void;
   onMarkerClick?: (location: Location) => void;
@@ -31,6 +32,7 @@ const useIsMobile = () => {
 const MapView: React.FC<MapViewProps> = ({
   locations,
   mapZoomLevel = 12,
+  primaryColor = '#3B82F6',
   onMapLoad,
   onMarkersLoad,
   onMarkerClick,
@@ -40,6 +42,7 @@ const MapView: React.FC<MapViewProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<any[]>([]); // Using any for now as AdvancedMarkerElement types might not be available
+  const circlesRef = useRef<google.maps.Circle[]>([]);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
   // Mobile popup state
@@ -71,10 +74,18 @@ const MapView: React.FC<MapViewProps> = ({
     });
 
     loader.load().then(() => {
+      const DEFAULT_CENTER = { lat: 40.7128, lng: -74.0060 };
+      const firstWithCoords = locations.find(
+        (loc) => loc.latitude != null && loc.longitude != null
+      );
+      const initialCenter = firstWithCoords
+        ? { lat: firstWithCoords.latitude!, lng: firstWithCoords.longitude! }
+        : DEFAULT_CENTER;
+
       if (mapRef.current && !mapInstance.current) {
-        // Initialize map with mapId for AdvancedMarkerElement support
+        // Initialize map centered on first location when available (else NYC default)
         mapInstance.current = new google.maps.Map(mapRef.current, {
-          center: { lat: 40.7128, lng: -74.0060 },
+          center: initialCenter,
           zoom: mapZoomLevel,
           mapTypeControl: false,
           fullscreenControl: true,
@@ -93,18 +104,24 @@ const MapView: React.FC<MapViewProps> = ({
         mapInstance.current.setZoom(mapZoomLevel);
       }
 
-      // Clear existing markers
+      // Clear existing markers and radius circles
       markersRef.current.forEach(marker => {
         if (marker.map) {
           marker.map = null; // Remove AdvancedMarkerElement from map
+        } else if (marker.setMap) {
+          marker.setMap(null);
         }
       });
       markersRef.current = [];
+
+      circlesRef.current.forEach(circle => circle.setMap(null));
+      circlesRef.current = [];
 
       // Add markers for locations
       if (mapInstance.current && locations.length > 0) {
         const bounds = new google.maps.LatLngBounds();
         const newMarkers: any[] = [];
+        const newCircles: google.maps.Circle[] = [];
 
         locations.forEach((location) => {
           if (location.latitude && location.longitude) {
@@ -185,10 +202,30 @@ const MapView: React.FC<MapViewProps> = ({
             }
 
             bounds.extend(position);
+
+            if (location.radius != null && location.radius > 0) {
+              const circle = new google.maps.Circle({
+                map: mapInstance.current!,
+                center: position,
+                radius: radiusToMeters(location.radius, location.radius_unit),
+                fillColor: primaryColor,
+                fillOpacity: 0.15,
+                strokeColor: primaryColor,
+                strokeOpacity: 0.5,
+                strokeWeight: 2,
+                clickable: false,
+              });
+              newCircles.push(circle);
+              const circleBounds = circle.getBounds();
+              if (circleBounds) {
+                bounds.union(circleBounds);
+              }
+            }
           }
         });
 
         markersRef.current = newMarkers;
+        circlesRef.current = newCircles;
 
         if (onMarkersLoadRef.current) {
           onMarkersLoadRef.current(newMarkers);
@@ -214,7 +251,7 @@ const MapView: React.FC<MapViewProps> = ({
     });
 
     return () => {
-      // Cleanup markers on unmount
+      // Cleanup markers and circles on unmount
       markersRef.current.forEach(marker => {
         if (marker.map) {
           marker.map = null; // For AdvancedMarkerElement
@@ -222,9 +259,11 @@ const MapView: React.FC<MapViewProps> = ({
           marker.setMap(null); // For regular Marker
         }
       });
+      circlesRef.current.forEach(circle => circle.setMap(null));
+      circlesRef.current = [];
     };
-    // Only re-run when locations or mapZoomLevel change, not when callbacks change
-  }, [locations, mapZoomLevel]);
+    // Only re-run when locations, mapZoomLevel, or primaryColor change, not when callbacks change
+  }, [locations, mapZoomLevel, primaryColor]);
 
   const createInfoWindowContent = (location: Location): string => {
     const getCurrentDayHours = () => {
@@ -232,6 +271,7 @@ const MapView: React.FC<MapViewProps> = ({
       const today = days[new Date().getDay()];
       return location.business_hours?.[today as keyof typeof location.business_hours] || 'Closed';
     };
+    const radiusLabel = formatRadiusLabel(location.radius, location.radius_unit);
 
     return `
       <div class="p-4 max-w-sm">
@@ -247,6 +287,16 @@ const MapView: React.FC<MapViewProps> = ({
             </svg>
             <span>${location.address}</span>
           </div>
+
+          ${radiusLabel ? `
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8" stroke-width="2"/>
+                <circle cx="12" cy="12" r="3" stroke-width="2"/>
+              </svg>
+              <span>Radius: ${radiusLabel}</span>
+            </div>
+          ` : ''}
 
           ${location.phone ? `
             <div class="flex items-center gap-2">
@@ -374,6 +424,21 @@ const MapView: React.FC<MapViewProps> = ({
                       <p className="text-gray-900">{mobileSelectedLocation.address}</p>
                     </div>
                   </div>
+
+                  {/* Radius */}
+                  {formatRadiusLabel(mobileSelectedLocation.radius, mobileSelectedLocation.radius_unit) && (
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-indigo-100 rounded-lg flex-shrink-0">
+                        <FiTarget className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <p className="text-sm text-gray-500 font-medium">Radius</p>
+                        <p className="text-gray-900 font-semibold">
+                          {formatRadiusLabel(mobileSelectedLocation.radius, mobileSelectedLocation.radius_unit)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Phone */}
                   {mobileSelectedLocation.phone && (
@@ -466,9 +531,10 @@ const MapView: React.FC<MapViewProps> = ({
 
 // Memoize to prevent unnecessary re-renders when unrelated props change
 export default memo(MapView, (prevProps, nextProps) => {
-  // Only re-render if locations or mapZoomLevel actually changed
+  // Only re-render if locations, mapZoomLevel, or primaryColor actually changed
   return (
     prevProps.locations === nextProps.locations &&
-    prevProps.mapZoomLevel === nextProps.mapZoomLevel
+    prevProps.mapZoomLevel === nextProps.mapZoomLevel &&
+    prevProps.primaryColor === nextProps.primaryColor
   );
 });
